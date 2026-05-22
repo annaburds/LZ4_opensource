@@ -1,0 +1,8 @@
+// Copyright 2022 OpenHW Group
+`verilator_config
+
+lint_off -rule WIDTHEXPAND -file "*sub_per_hash.sv"
+
+lint_off -rule WIDTHTRUNC -file "*sub_per_hash.sv"
+
+lint_off -rule UNUSEDSIGNAL -file "*sub_per_hash.sv"

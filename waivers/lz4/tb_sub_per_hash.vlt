@@ -1,0 +1,4 @@
+// Copyright 2022 OpenHW Group
+`verilator_config
+
+lint_off -rule PINCONNECTEMPTY -file "*tb_sub_per_hash.sv"
