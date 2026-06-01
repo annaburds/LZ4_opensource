@@ -20,6 +20,8 @@ module process_frame_top #(
     logic [HashWidth-1:0] hash;
     logic hash_register_reset;
     logic [3:0] counter;
+    logic ready_for_new_data;
+    logic data_valid_i;
 
     process_frame_fsm #(.InpWidth(InpWidth), .HashWidth(HashWidth)) 
                     FSM
@@ -27,7 +29,9 @@ module process_frame_top #(
                      .hash_table_saved_i(hash_table_saved), .new_frame_ready_i(new_frame_ready), 
                      .hash_reg_saved_i(hash_reg_saved), .next_frame_same_i(next_frame_same), 
                      .seen_frame_ready_i(seen_frame_ready), .frame_received_i(frame_received),
-                     .hash_register_reset_o(hash_register_reset), .counter_o(counter));
+                     .hash_register_reset_o(hash_register_reset), .counter_o(counter), 
+                     .ready_for_new_data_o(ready_for_new_data), .evict_word_o(), .save_hash_to_table_o(), .save_hash_to_register_o(), 
+                     .assemble_new_frame_o(), .assemble_seen_frame_o(), .send_frame_o(), .data_valid_i(data_valid_i));
 
     sub_per_hash #(.InpWidth(InpWidth), .HashWidth(HashWidth)) 
                     HASH_GENERATOR
@@ -36,22 +40,31 @@ module process_frame_top #(
     // TO DO: IMPLEMENT HASH TABLE AND HASH REGISTER MODULES
     hash_table #(.HashWidth(HashWidth)) 
                     HASH_TABLE
-                    (.clk_i(clk_i), .rst_ni(rst_ni), .hash_i(hash), .hash_saved_o(hash_table_saved), .table_full_o(table_full));
+                    (.clk_i(clk_i), .rst_ni(rst_ni), .hash_i(hash), 
+                     .hash_saved_o(hash_table_saved), .table_full_o(table_full));
     
     register #(.Width(HashWidth)) 
                     HASH_REGISTER
-                    (.clk_i(clk_i), .rst_ni(rst_ni), .d_i(hash), .q_o(), .en_i(hash_reg_saved), .reset_i(hash_register_reset));
+                    (.clk_i(clk_i), .rst_ni(rst_ni), .d_i(hash), .q_o(), .en_i(hash_reg_saved), 
+                     .reset_i(hash_register_reset));
 
     // TO DO: IMPLEMENT FRAME ASSEMBLER MODULE
     seen_frame_assembler #(.InpWidth(InpWidth), .HashWidth(HashWidth)) 
                     SEEN_FRAME_ASSEMBLER
-                    (.clk_i(clk_i), .rst_ni(rst_ni), .hash_i(hash), .counter_i(counter), .seen_frame_o(frame_o), .seen_frame_ready_o(seen_frame_ready));
+                    (.clk_i(clk_i), .rst_ni(rst_ni), .hash_i(hash), .counter_i(counter), 
+                     .seen_frame_o(frame_o), .seen_frame_ready_o(seen_frame_ready));
 
     new_frame_assembler #(.InpWidth(InpWidth), .HashWidth(HashWidth)) 
                     NEW_FRAME_ASSEMBLER
-                    (.clk_i(clk_i), .rst_ni(rst_ni), .data_i(data_i), .new_frame_o(frame_o), .new_frame_ready_o(new_frame_ready));
+                    (.clk_i(clk_i), .rst_ni(rst_ni), .data_i(data_i), .new_frame_o(frame_o), 
+                     .new_frame_ready_o(new_frame_ready));
     
-    
+    output_buffer #(.Width(FrameWidth)) 
+                    OUTPUT_BUFFER
+                    (.clk_i(clk_i), .rst_ni(rst_ni), .d_i(frame_o), .q_o(frame_o), 
+                     .en_i(new_frame_ready | seen_frame_ready), .reset_i(1'b0), 
+                     .full_o(frame_received));
+
     
 
     
@@ -78,7 +91,8 @@ module process_frame_fsm #(
     output logic assemble_new_frame_o,
     output logic assemble_seen_frame_o,
     output logic send_frame_o,
-    output logic [3:0] counter_o
+    output logic [3:0] counter_o,
+    output logic ready_for_new_data_o
 );
     enum logic [3:0] {
         START,
@@ -110,6 +124,7 @@ module process_frame_fsm #(
         assemble_new_frame_o = 0;
         assemble_seen_frame_o = 0;
         send_frame_o = 0;
+        ready_for_new_data_o = 1'b1;
 
 
         case( current_state )
@@ -118,59 +133,63 @@ module process_frame_fsm #(
                 hash_register_reset_o = 1'b1;
                 counter_o = 0;
 
-                if (new_word_i & table_full_i) next_state = TABLE_FULL;
-                else if (new_word_i) next_state = NEW_WORD;
-                else next_state = SEEN_WORD;
+                if (~data_valid_i)                      next_state = START; // Stay in START state until data is valid
+                else if (new_word_i && table_full_i)    next_state = TABLE_FULL;
+                else if (new_word_i)                    next_state = NEW_WORD;
+                else                                    next_state = SEEN_WORD;
             end
             TABLE_FULL: begin
                 // Evict a word from the hash table
                 evict_word_o = 1'b1;
 
-                if (table_full_i) next_state = TABLE_FULL;
-                else next_state = NEW_WORD;
+                if (table_full_i)                       next_state = TABLE_FULL;
+                else                                    next_state = NEW_WORD;
             end
             NEW_WORD: begin
                 // Save hash to the hash table
                 save_hash_to_table_o = 1'b1;
 
-                if (hash_table_saved_i) next_state = MAKE_NEW_FRAME;
-                else next_state = NEW_WORD;
+                if (hash_table_saved_i)                 next_state = MAKE_NEW_FRAME;
+                else                                    next_state = NEW_WORD;
             end
             MAKE_NEW_FRAME: begin
                 // Make new frame containing uncompressed word
                 assemble_new_frame_o = 1'b1;
 
-                if (new_frame_ready_i) next_state = SEND_FRAME;
-                else next_state = MAKE_NEW_FRAME;
+                if (new_frame_ready_i)                  next_state = SEND_FRAME;
+                else                                    next_state = MAKE_NEW_FRAME;
             end
             SEEN_WORD: begin
                 // Save hash to register
                 save_hash_to_register_o = 1'b1;
 
-                if (hash_reg_saved_i) next_state = CHECK_NEXT_WORD;
-                else next_state = SEEN_WORD;
+                if (hash_reg_saved_i)                   next_state = CHECK_NEXT_WORD;
+                else                                    next_state = SEEN_WORD;
             end
             CHECK_NEXT_WORD: begin
                 // Increment counter
                 // Since counter starts at 0, we can add one before checking if the next frame is the same
                 counter_o = counter_o + 1;
 
-                if (next_frame_same_i) next_state = MAKE_SEEN_FRAME;
-                else next_state = MAKE_NEW_FRAME;
+                if (next_frame_same_i)                  next_state = CHECK_NEXT_WORD;
+                else                                    next_state = MAKE_SEEN_FRAME;
             end
             MAKE_SEEN_FRAME: begin
                 // Assemble frame containing hash and counter value
                 assemble_seen_frame_o = 1'b1;
 
-                if (hash_reg_saved_i) next_state = SEND_FRAME;
-                else next_state = MAKE_SEEN_FRAME;
+                if (hash_reg_saved_i)                   next_state = SEND_FRAME;
+                else                                    next_state = MAKE_SEEN_FRAME;
             end
             SEND_FRAME: begin
                 // Send frame to output FIFO
                 send_frame_o = 1'b1;
 
-                if (frame_received_i) next_state = START;
-                else next_state = SEND_FRAME;
+                if (frame_received_i) {                 next_state = START;
+                    send_frame_o = 1'b0; // Stop sending frame after it has been received
+                    ready_for_new_data_o = 1'b1; // Ready for new data after sending the frame
+                }
+                else                                    next_state = SEND_FRAME;
             end
         endcase
     end
