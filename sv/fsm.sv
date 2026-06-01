@@ -1,5 +1,7 @@
 `default_nettype none
 
+// TODO: create a mode to stop compressing the data if the hash table is full and we don't want to evict anything
+
 module process_frame_top #(
     parameter int unsigned InpWidth   = 32'd32,
     parameter int unsigned HashWidth  = 32'd5, 
@@ -49,7 +51,6 @@ module process_frame_top #(
                     (.clk_i(clk_i), .rst_ni(rst_ni), .d_i(hash), .q_o(), .en_i(hash_reg_saved), 
                      .reset_i(hash_register_reset));
 
-    // TO DO: IMPLEMENT FRAME ASSEMBLER MODULE
     seen_frame_assembler #(.InpWidth(InpWidth), .HashWidth(HashWidth)) 
                     SEEN_FRAME_ASSEMBLER
                     (.clk_i(clk_i), .rst_ni(rst_ni), .hash_i(hash), .counter_i(counter), 
@@ -59,12 +60,6 @@ module process_frame_top #(
                     NEW_FRAME_ASSEMBLER
                     (.clk_i(clk_i), .rst_ni(rst_ni), .data_i(data_i), .new_frame_o(frame_o), 
                      .new_frame_ready_o(new_frame_ready));
-    
-    output_buffer #(.Width(FrameWidth)) 
-                    OUTPUT_BUFFER
-                    (.clk_i(clk_i), .rst_ni(rst_ni), .d_i(frame_o), .q_o(frame_o), 
-                     .en_i(new_frame_ready | seen_frame_ready), .reset_i(1'b0), 
-                     .full_o(frame_received));
 
     
 
@@ -190,8 +185,8 @@ module process_frame_fsm #(
                 send_frame_o = 1'b1;
 
                 if (frame_received_i) {                 next_state = START;
-                    send_frame_o = 1'b0; // Stop sending frame after it has been received
-                    ready_for_new_data_o = 1'b1; // Ready for new data after sending the frame
+                    send_frame_o = 1'b0;                // Stop sending frame after it has been received
+                    ready_for_new_data_o = 1'b1;        // Ready for new data after sending the frame
                 }
                 else                                    next_state = SEND_FRAME;
             end

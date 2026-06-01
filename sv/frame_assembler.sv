@@ -1,5 +1,8 @@
 `default_nettype none
 
+// TODO: implement a function/task to calculate checksum values for header, block, and content
+// TODO: add parameters or inputs to set optional flags
+
 module new_frame_assembler #(
     parameter int unsigned InpWidth   = RAW_WORD_LEN,
     parameter int unsigned HashWidth  = HASH_LEN
@@ -23,7 +26,8 @@ module new_frame_assembler #(
     new_frame_o.FrameDescriptor.FLG.VERSION = 2'b01; 
     new_frame_o.FrameDescriptor.FLG.BLOCK_INDEPENDENCE_FLAG = 1'b1;    // necessary for multithreading
 
-    // TODO: include optional fields as desired (block checksum, content checksum, dict id, content size)    new_frame_ready_o <= 1'b1; 
+    // TODO: include optional fields as desired (block checksum, content checksum, dict id, content size)    
+    new_frame_ready_o <= 1'b1; 
 
 endmodule : new_frame_assembler
 
