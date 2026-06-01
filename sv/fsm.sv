@@ -2,7 +2,8 @@
 
 module process_frame_top #(
     parameter int unsigned InpWidth   = 32'd32,
-    parameter int unsigned HashWidth  = 32'd5
+    parameter int unsigned HashWidth  = 32'd5, 
+    parameter int unsigned RepeatCounterWidth = 32'd4
 ) (
     input logic clk_i,
     input logic rst_ni,
@@ -72,7 +73,8 @@ endmodule : process_frame_top
 
 module process_frame_fsm #(
     parameter int unsigned InpWidth   = 32'd32,
-    parameter int unsigned HashWidth  = 32'd5
+    parameter int unsigned HashWidth  = 32'd5,
+    parameter int unsigned RepeatCounterWidth = 32'd4
 ) (
     input logic clk_i,
     input logic rst_ni,
@@ -171,8 +173,10 @@ module process_frame_fsm #(
                 // Since counter starts at 0, we can add one before checking if the next frame is the same
                 counter_o = counter_o + 1;
 
-                if (next_frame_same_i)                  next_state = CHECK_NEXT_WORD;
-                else                                    next_state = MAKE_SEEN_FRAME;
+                // Prevent counter overflow
+                if (counter_o == {RepeatCounterWidth{1'b1}} || ~next_frame_same_i) 
+                                                        next_state = MAKE_SEEN_FRAME;
+                else                                    next_state = CHECK_NEXT_WORD;
             end
             MAKE_SEEN_FRAME: begin
                 // Assemble frame containing hash and counter value
