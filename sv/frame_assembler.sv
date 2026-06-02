@@ -1,3 +1,14 @@
+/*
+ * frame_assembler.sv
+ *
+ * Module to assemble new and seen frames based on the LZ4 frame format specification.
+ * This module takes in raw data for new frames and hash/counter values for seen frames,
+ * and outputs the corresponding frame structures ready for transmission or storage.
+ *
+ * Author: Adriana Holtzman
+ *
+ */
+
 `default_nettype none
 `include "sv/frame_struct.sv"
 
