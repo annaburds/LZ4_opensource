@@ -1,6 +1,6 @@
 `default_nettype none
 
-module fsm_tb#(
+module tb_fsm#(
     parameter int unsigned FrameWidth = 32'd32
     parameter int unsigned InpWidth   = 32'd32,
     parameter int unsigned HashWidth  = 32'd5
@@ -39,7 +39,7 @@ module fsm_tb#(
     initial begin
         // verilator
         $dumpfile("wave.vcd");
-        $dumpvars(0, fsm_tb);
+        $dumpvars(0, tb_fsm);
 
         // reset
         clk_i <= 0;
@@ -77,4 +77,4 @@ module fsm_tb#(
         $finish;
     end
 
-endmodule : fsm_tb
+endmodule : tb_fsm

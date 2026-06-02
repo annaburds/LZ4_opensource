@@ -1,64 +1,109 @@
 `default_nettype none
+`include "sv/frame_struct.sv"
 
 // TODO: implement a function/task to calculate checksum values for header, block, and content
 // TODO: add parameters or inputs to set optional flags
 
-module new_frame_assembler #(
-    parameter int unsigned InpWidth   = RAW_WORD_LEN,
-    parameter int unsigned HashWidth  = HASH_LEN
-) (
-    input logic clk_i,
-    input logic rst_ni,
-    input logic [InpWidth-1:0] data_i,
-    output logic [FrameWidth-1:0] new_frame_o,
-    output logic new_frame_ready_o
+module new_frame_assembler (
+    input  logic                                    clk_i,
+    input  logic                                    rst_ni,
+    input  logic [RAW_WORD_LEN-1:0]                 data_i,
+    output logic [$bits(new_frame_struct_t)-1:0]    new_frame_o,
+    output logic                                    new_frame_ready_o
 );
     // TO DO: IMPLEMENT THE ASSEMBLY OF A NEW FRAME, WHICH CONSISTS OF THE RAW DATA WORD
     // New frame format, containing the hash and counter values
-    new_frame_o = new_frame_struct_t'(0);                              // initialize the frame to all 0s
-    new_frame_o.RawData = data_i;                                      // assign the raw data to the appropriate field
-    new_frame_o.DataBlock.DataSize = RAW_WORD_LEN;                     // the size of the data block is the size of the raw data
-    new_frame_o.FrameDescriptor.BD.DATA_MAXSIZE = 3'b100;              // 4 --> 64 KB max uncompressed data size
-    new_frame_o.FrameDescriptor.HC = 8'hFF;                            // TODO: replace placeholder value for header checksum
+    new_frame_struct_t new_frame_o; 
 
-    // The following values are hardcoded. They should not change.
-    new_frame_o.MagicNumber = 32'h184D2204;           
-    new_frame_o.FrameDescriptor.FLG.VERSION = 2'b01; 
-    new_frame_o.FrameDescriptor.FLG.BLOCK_INDEPENDENCE_FLAG = 1'b1;    // necessary for multithreading
+    initial begin
+        new_frame_o = '{
+            MagicNumber: 32'h184D_2204,           
+            FrameDescriptor: '{
+                FLG: '{
+                    VERSION_MSB: 1'b0,                // version is hardcoded to 01
+                    VERSION_LSB: 1'b1,
+                    BLOCK_INDEPENDENCE_FLAG: 1'b1,    // necessary for multithreading
+                    BLOCK_CHECKSUM_FLAG: 1'b0,        // optional
+                    CONTENT_SIZE_FLAG: 1'b0,          // optional
+                    CONTENT_CHECKSUM_FLAG: 1'b0,      // optional
+                    DICTID_FLAG: 1'b0                 // optional
+                },
+                BD: '{
+                    RESERVED_BIT_7: 1'b0,
+                    DATA_MAXSIZE_6: 1'b1,           // 4 --> 64 KB, 5 --> 256 KB, 6 --> 1 MB, 7 --> 4 MB
+                    DATA_MAXSIZE_5: 1'b0,
+                    DATA_MAXSIZE_4: 1'b0,
+                    RESERVED_BIT_3: 1'b0,
+                    RESERVED_BIT_2: 1'b0,
+                    RESERVED_BIT_1: 1'b0,
+                    RESERVED_BIT_0: 1'b0
+                },
+                HC: 8'hFF                            // TODO: replace placeholder value for header checksum
+            },
+            DataBlock: '{
+                DataSize: RAW_WORD_LEN, 
+                RawData: data_i
+            },
+            EndMark: 32'h0000_0000,              
+            ContentChecksum: 32'hFFFF_FFFF           // TODO: replace placeholder value
+        };
+    end
 
     // TODO: include optional fields as desired (block checksum, content checksum, dict id, content size)    
-    new_frame_ready_o <= 1'b1; 
+    assign new_frame_ready_o = 1'b1; 
 
 endmodule : new_frame_assembler
 
-module seen_frame_assembler #(
-    parameter int unsigned InpWidth   = RAW_WORD_LEN,
-    parameter int unsigned HashWidth  = HASH_LEN
-) (
-    input logic clk_i,
-    input logic rst_ni,
-    input logic [HashWidth-1:0] hash_i,
-    input logic [3:0] counter_i, // for the number of times we've seen this hash before
-    output logic [FrameWidth-1:0] seen_frame_o,
-    output logic seen_frame_ready_o
+module seen_frame_assembler (
+    input  logic                                    clk_i,
+    input  logic                                    rst_ni,
+    input  logic [HASH_LEN-1:0]                     hash_i,
+    input  logic [REPEAT_COUNTER_LEN-1:0]           counter_i, // for the number of times we've seen this hash before
+    output logic [$bits(seen_frame_struct_t)-1:0]   seen_frame_o,
+    output logic                                    seen_frame_ready_o
 );
 
     // Seen frame format, containing the hash and counter values
-    seen_frame_o = seen_frame_struct_t'(0);                             // initialize the frame to all 0s
-    seen_frame_o.DataBlock.Hash = hash_i;                               // assign the hash to the appropriate field
-    seen_frame_o.DataBlock.RepeatCounter = counter_i;                   // assign the counter to the appropriate field
-    seen_frame_o.DataBlock.DataSize = HASH_LEN + REPEAT_COUNTER_LEN;    // the size of the data block is the size of the hash and counter
-    seen_frame_o.FrameDescriptor.BD.DATA_MAXSIZE = 3'b100;              // 4 --> 64 KB max uncompressed data size
-    seen_frame_o.FrameDescriptor.HC = 8'hFF;                            // TODO: replace placeholder value for header checksum
+    seen_frame_struct_t seen_frame_o; 
 
-    // The following values are hardcoded. They should not change.
-    seen_frame_o.MagicNumber = 32'h184D2204;           
-    seen_frame_o.FrameDescriptor.FLG.VERSION = 2'b01; 
-    seen_frame_o.FrameDescriptor.FLG.BLOCK_INDEPENDENCE_FLAG = 1'b1;    // necessary for multithreading
+    initial begin
+        seen_frame_o = '{
+            MagicNumber: 32'h184D_2204,           
+            FrameDescriptor: '{
+                FLG: '{
+                    VERSION_MSB: 1'b0,                // version is hardcoded to 01
+                    VERSION_LSB: 1'b1,
+                    BLOCK_INDEPENDENCE_FLAG: 1'b1,    // necessary for multithreading
+                    BLOCK_CHECKSUM_FLAG: 1'b0,        // optional
+                    CONTENT_SIZE_FLAG: 1'b0,          // optional
+                    CONTENT_CHECKSUM_FLAG: 1'b0,      // optional
+                    DICTID_FLAG: 1'b0                 // optional
+                },
+                BD: '{
+                    RESERVED_BIT_7: 1'b0,
+                    DATA_MAXSIZE_6: 1'b1,           // 4 --> 64 KB, 5 --> 256 KB, 6 --> 1 MB, 7 --> 4 MB
+                    DATA_MAXSIZE_5: 1'b0,
+                    DATA_MAXSIZE_4: 1'b0,
+                    RESERVED_BIT_3: 1'b0,
+                    RESERVED_BIT_2: 1'b0,
+                    RESERVED_BIT_1: 1'b0,
+                    RESERVED_BIT_0: 1'b0
+                },
+                HC: 8'hFF                            // TODO: replace placeholder value for header checksum
+            },
+            DataBlock: '{
+                DataSize: HASH_LEN + REPEAT_COUNTER_LEN, 
+                Hash: hash_i,
+                RepeatCounter: counter_i
+            },
+            EndMark: 32'h0000_0000,              
+            ContentChecksum: 32'hFFFF_FFFF           // TODO: replace placeholder value
+        };
+    end
 
     // TODO: include optional fields as desired (block checksum, content checksum, dict id, content size)
     // TODO: will need to differentiate the frame format for seen vs new frames, maybe use the FLG byte in the frame descriptor to indicate this?
 
-    seen_frame_ready_o <= 1'b1; 
+    assign seen_frame_ready_o = 1'b1; 
 
 endmodule : seen_frame_assembler

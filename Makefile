@@ -1,13 +1,17 @@
 
-MODULE = tb_sub_per_hash
+MODULE = tb_fsm
 
 SRC = \
-    sv/sub_per_hash.sv \
-    sv/tb_sub_per_hash.sv
+	sv/frame_assembler.sv \
+	sv/frame_struct.sv \
+	sv/fsm.sv \
+	sv/hash_register.sv \
+	sv/hash_table.sv \
+	sv/sub_per_hash.sv \
+	sv/tb_fsm.sv
 
 WAIVERS = \
-	waivers/pulp_platform/sub_per_hash_waivers.vlt \
-	waivers/lz4/tb_sub_per_hash.vlt 
+	waivers/pulp_platform/sub_per_hash_waivers.vlt 
 
 VERILATOR_FLAGS = \
 
@@ -44,4 +48,3 @@ clean:
 	rm -rf .stamp.*;
 	rm -rf ./obj_dir
 	rm -rf waveform.vcd
-	
