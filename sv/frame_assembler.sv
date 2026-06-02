@@ -10,7 +10,7 @@
  */
 
 `default_nettype none
-`include "sv/frame_struct.sv"
+import frame_pkg::*;
 
 // TODO: implement a function/task to calculate checksum values for header, block, and content
 // TODO: add parameters or inputs to set optional flags

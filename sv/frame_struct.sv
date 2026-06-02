@@ -7,6 +7,8 @@
 * Author: Adriana Holtzman 
 */
 
+package frame_pkg;
+
 // Define macros 
 `define HASH_LEN            32'd5 // example lengths, adjust as needed
 `define REPEAT_COUNTER_LEN  32'd4 
@@ -67,3 +69,5 @@ typedef struct packed {
     logic [31:0]                EndMark;            // 4 bytes
     logic [31:0]                ContentChecksum;    // 0-4 bytes (optional, only if FLG[2] is set)
 } new_frame_struct_t;
+
+endpackage : frame_pkg

@@ -3,14 +3,15 @@
 // TODO: create a mode to stop compressing the data if the hash table is full and we don't want to evict anything
 
 module process_frame_top #(
-    parameter int unsigned InpWidth   = 32'd32,
-    parameter int unsigned HashWidth  = 32'd5, 
-    parameter int unsigned RepeatCounterWidth = 32'd4
+    parameter int unsigned InpWidth   = RAW_WORD_LEN,
+    parameter int unsigned HashWidth  = HASH_LEN, 
+    parameter int unsigned RepeatCounterWidth = REPEAT_COUNTER_WIDTH
 ) (
-    input logic clk_i,
-    input logic rst_ni,
-    input logic [InpWidth-1:0] data_i,
-    output logic [FrameWidth-1:0] frame_o
+    input  logic clk_i,
+    input  logic rst_ni,
+    input  logic [InpWidth-1:0] data_i,
+    // TODO standardize frame output width
+    output logic [$max($bits(new_frame_struct_t), $bits(seen_frame_struct_t))-1:0] frame_o
 );
     logic new_word;
     logic table_full;
@@ -196,10 +197,11 @@ module process_frame_fsm #(
                 // Send frame to output FIFO
                 send_frame_o = 1'b1;
 
-                if (frame_received_i) {                 next_state = START;
+                if (frame_received_i) begin
+                                                        next_state = START;
                     send_frame_o = 1'b0;                // Stop sending frame after it has been received
                     ready_for_new_data_o = 1'b1;        // Ready for new data after sending the frame
-                }
+                end
                 else                                    next_state = SEND_FRAME;
             end
         endcase

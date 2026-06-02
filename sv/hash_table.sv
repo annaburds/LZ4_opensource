@@ -1,9 +1,14 @@
 `default_nettype none
+import frame_pkg::*;
+
+typedef struct packed {
+    logic [HASH_LEN-1:0]       Hash;
+    logic [RAW_WORD_LEN-1:0]   Data;
+    logic                      Valid;
+} hash_table_entry_t;
 
 module hash_table #(
-    parameter int HASH_LEN      = 16,
-    parameter int RAW_WORD_LEN  = 32,
-    parameter int NUM_ENTRIES   = 256
+    parameter int unsigned NUM_ENTRIES   = 256
 )(
     input  logic clk_i,
     input  logic rst_ni,
@@ -17,15 +22,9 @@ module hash_table #(
     output logic                         table_full_o
 );
 
-    typedef struct packed {
-        logic [HASH_LEN-1:0]       Hash;
-        logic [RAW_WORD_LEN-1:0]   Data;
-        logic                      Valid;
-    } hash_table_entry_t;
-
     hash_table_entry_t table [NUM_ENTRIES];
 
-    logic [$clog2(NUM_ENTRIES):0] next_free;
+    logic [$clog2(NUM_ENTRIES)-1:0] next_free;
 
     // combinational logic to check if the hash is already in the table 
     // and to output the corresponding data
