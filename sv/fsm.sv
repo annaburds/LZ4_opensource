@@ -25,6 +25,8 @@ module process_frame_top #(
     logic [3:0] counter;
     logic ready_for_new_data;
     logic data_valid_i;
+    logic data_o;
+    logic save_hash_to_register;
 
     process_frame_fsm #(.InpWidth(InpWidth), .HashWidth(HashWidth)) 
                     FSM
@@ -33,7 +35,8 @@ module process_frame_top #(
                      .hash_reg_saved_i(hash_reg_saved), .next_frame_same_i(next_frame_same), 
                      .seen_frame_ready_i(seen_frame_ready), .frame_received_i(frame_received),
                      .hash_register_reset_o(hash_register_reset), .counter_o(counter), 
-                     .ready_for_new_data_o(ready_for_new_data), .evict_word_o(), .save_hash_to_table_o(), .save_hash_to_register_o(), 
+                     .ready_for_new_data_o(ready_for_new_data), .evict_word_o(), .save_hash_to_table_o(), 
+                     .save_hash_to_register_o(save_hash_to_register), 
                      .assemble_new_frame_o(), .assemble_seen_frame_o(), .send_frame_o(), .data_valid_i(data_valid_i));
 
     sub_per_hash #(.InpWidth(InpWidth), .HashWidth(HashWidth)) 
@@ -43,13 +46,13 @@ module process_frame_top #(
     // TO DO: IMPLEMENT HASH TABLE AND HASH REGISTER MODULES
     hash_table #(.HashWidth(HashWidth)) 
                     HASH_TABLE
-                    (.clk_i(clk_i), .rst_ni(rst_ni), .hash_i(hash), 
-                     .hash_saved_o(hash_table_saved), .table_full_o(table_full));
+                    (.clk_i(clk_i), .rst_ni(rst_ni), .hash_i(hash), .insert_i(save_hash_to_table_o), .data_i(data_i),
+                     .hash_saved_o(hash_table_saved), .table_full_o(table_full), .data_o(data_o));
     
     register #(.Width(HashWidth)) 
                     HASH_REGISTER
-                    (.clk_i(clk_i), .rst_ni(rst_ni), .d_i(hash), .q_o(), .en_i(hash_reg_saved), 
-                     .reset_i(hash_register_reset));
+                    (.clk_i(clk_i), .rst_ni(rst_ni), .d_i(hash), .q_o(), .en_i(save_hash_to_register), 
+                     .reset_i(hash_register_reset), .saved_o(hash_reg_saved));
 
     seen_frame_assembler #(.InpWidth(InpWidth), .HashWidth(HashWidth)) 
                     SEEN_FRAME_ASSEMBLER
@@ -73,7 +76,6 @@ module process_frame_fsm #(
 ) (
     input logic clk_i,
     input logic rst_ni,
-    input logic new_word_i,
     input logic table_full_i,
     input logic hash_table_saved_i,
     input logic new_frame_ready_i,
@@ -91,6 +93,9 @@ module process_frame_fsm #(
     output logic [3:0] counter_o,
     output logic ready_for_new_data_o
 );
+    logic seen;
+
+    // State encoding
     enum logic [3:0] {
         START,
         TABLE_FULL,
@@ -123,20 +128,25 @@ module process_frame_fsm #(
         send_frame_o = 0;
         ready_for_new_data_o = 1'b1;
 
-
         case( current_state )
             START: begin
                 // Reset the hash register and counter for the new frame.
                 hash_register_reset_o = 1'b1;
                 counter_o = 0;
 
+                // Check if the new word's hash is already in the table
+                // Hash table and hash generator are combinational 
+                // Do we need to wait a cycle for the hash to be generated and the table to be checked? If so, we can add a WAIT state here.
+                assign seen = data_i == data_o;
+
                 if (~data_valid_i)                      next_state = START; // Stay in START state until data is valid
-                else if (new_word_i && table_full_i)    next_state = TABLE_FULL;
-                else if (new_word_i)                    next_state = NEW_WORD;
+                else if (~seen && table_full_i)         next_state = TABLE_FULL;
+                else if (~seen)                         next_state = NEW_WORD;
                 else                                    next_state = SEEN_WORD;
             end
             TABLE_FULL: begin
                 // Evict a word from the hash table
+                // TO DO: IMPLEMENT EVICTION POLICY FOR HASH TABLE
                 evict_word_o = 1'b1;
 
                 if (table_full_i)                       next_state = TABLE_FULL;
@@ -160,8 +170,10 @@ module process_frame_fsm #(
                 // Save hash to register
                 save_hash_to_register_o = 1'b1;
 
-                if (hash_reg_saved_i)                   next_state = CHECK_NEXT_WORD;
-                else                                    next_state = SEEN_WORD;
+                                                        next_state = CHECK_NEXT_WORD;
+
+                // if (hash_reg_saved_i)                   next_state = CHECK_NEXT_WORD;
+                // else                                    next_state = SEEN_WORD;
             end
             CHECK_NEXT_WORD: begin
                 // Increment counter
@@ -177,7 +189,7 @@ module process_frame_fsm #(
                 // Assemble frame containing hash and counter value
                 assemble_seen_frame_o = 1'b1;
 
-                if (hash_reg_saved_i)                   next_state = SEND_FRAME;
+                if (seen_frame_ready_i)                 next_state = SEND_FRAME;
                 else                                    next_state = MAKE_SEEN_FRAME;
             end
             SEND_FRAME: begin
