@@ -3,16 +3,19 @@
 // TODO: create a mode to stop compressing the data if the hash table is full and we don't want to evict anything
 
 module process_frame_top #(
-    parameter int unsigned InpWidth   = `RAW_WORD_LEN,
-    parameter int unsigned HashWidth  = `HASH_LEN, 
-    parameter int unsigned RepeatCounterWidth = `REPEAT_COUNTER_LEN
+    parameter int unsigned InpWidth            = 32,
+    parameter int unsigned HashWidth           = 5,
+    parameter int unsigned RepeatCounterWidth  = 4
 ) (
     input  logic clk_i,
     input  logic rst_ni,
     input  logic [InpWidth-1:0] data_i,
     input  logic data_valid_i,
+    input  logic frame_received_i,
     // TODO standardize frame output width
-    output generic_frame_struct_t frame_o
+    output generic_frame_struct_t frame_o,
+    output logic ready_for_new_data_o,
+    output logic send_frame_o
 );
     logic new_word;
     logic table_full;
@@ -21,62 +24,63 @@ module process_frame_top #(
     logic hash_reg_saved;
     logic next_frame_same;
     logic seen_frame_ready;
-    logic frame_received;
     logic [HashWidth-1:0] hash;
     logic hash_register_reset;
     logic [3:0] counter;
     logic ready_for_new_data;
-    logic data_valid_i;
-    logic data_o;
+    logic [InpWidth-1:0] data_o;
     logic save_hash_to_register;
     logic hash_match;
+    logic save_hash_to_table;
 
-    process_frame_fsm #(.InpWidth(InpWidth), .HashWidth(HashWidth)) 
+    assign ready_for_new_data_o = ready_for_new_data;
+
+    process_frame_fsm #(.InpWidth(InpWidth), .HashWidth(HashWidth))
                     FSM
-                    (.clk_i(clk_i), .rst_ni(rst_ni), .new_word_i(new_word), .table_full_i(table_full), 
-                     .hash_table_saved_i(hash_table_saved), .new_frame_ready_i(new_frame_ready), 
-                     .hash_reg_saved_i(hash_reg_saved), .next_frame_same_i(next_frame_same), 
-                     .seen_frame_ready_i(seen_frame_ready), .frame_received_i(frame_received),
+                    (.clk_i(clk_i), .rst_ni(rst_ni), .table_full_i(table_full),
+                     .hash_table_saved_i(hash_table_saved), .new_frame_ready_i(new_frame_ready),
+                     .hash_reg_saved_i(hash_reg_saved), .next_frame_same_i(next_frame_same),
+                     .seen_frame_ready_i(seen_frame_ready), .frame_received_i(frame_received_i),
                      .hash_match_i(hash_match), .data_valid_i(data_valid_i),
-                     .hash_register_reset_o(hash_register_reset), .counter_o(counter), 
-                     .ready_for_new_data_o(ready_for_new_data), .evict_word_o(), .save_hash_to_table_o(), 
-                     .save_hash_to_register_o(save_hash_to_register), 
-                     .assemble_new_frame_o(), .assemble_seen_frame_o(), .send_frame_o(), .data_valid_i(data_valid_i));
+                     .hash_register_reset_o(hash_register_reset), .counter_o(counter),
+                     .ready_for_new_data_o(ready_for_new_data), .evict_word_o(),
+                     .save_hash_to_table_o(save_hash_to_table),
+                     .save_hash_to_register_o(save_hash_to_register),
+                     .assemble_new_frame_o(), .assemble_seen_frame_o(),
+                     .send_frame_o(send_frame_o));
 
-    sub_per_hash #(.InpWidth(InpWidth), .HashWidth(HashWidth)) 
+    sub_per_hash #(.InpWidth(InpWidth), .HashWidth(HashWidth))
                     HASH_GENERATOR
                     (.data_i(data_i), .hash_o(hash), .hash_onehot_o());
 
     // TO DO: IMPLEMENT HASH TABLE AND HASH REGISTER MODULES
-    hash_table #(.HashWidth(HashWidth)) 
+    hash_table #(.HashLen(HashWidth), .RawWordLen(InpWidth))
                     HASH_TABLE
-                    (.clk_i(clk_i), .rst_ni(rst_ni), .hash_i(hash), .insert_i(save_hash_to_table_o), .data_i(data_i),
+                    (.clk_i(clk_i), .rst_ni(rst_ni), .hash_i(hash), .insert_i(save_hash_to_table), .data_i(data_i),
                      .hash_saved_o(hash_table_saved), .table_full_o(table_full), .data_o(data_o), .hash_match_o(hash_match));
-    
-    register #(.Width(HashWidth)) 
+
+    hash_register #(.Width(HashWidth))
                     HASH_REGISTER
-                    (.clk_i(clk_i), .rst_ni(rst_ni), .d_i(hash), .q_o(), .en_i(save_hash_to_register), 
+                    (.clk_i(clk_i), .rst_ni(rst_ni), .data_i(hash), .q_o(), .en_i(save_hash_to_register),
                      .reset_i(hash_register_reset), .saved_o(hash_reg_saved));
 
-    seen_frame_assembler #(.InpWidth(InpWidth), .HashWidth(HashWidth)) 
+    seen_frame_assembler #(.RawWordLen(InpWidth), .HashLen(HashWidth), .RepeatCounterLen(RepeatCounterWidth))
                     SEEN_FRAME_ASSEMBLER
-                    (.clk_i(clk_i), .rst_ni(rst_ni), .hash_i(hash), .counter_i(counter), 
+                    (.clk_i(clk_i), .rst_ni(rst_ni), .hash_i(hash), .counter_i(counter),
                      .seen_frame_o(frame_o), .seen_frame_ready_o(seen_frame_ready));
 
-    new_frame_assembler #(.InpWidth(InpWidth), .HashWidth(HashWidth)) 
+    new_frame_assembler #(.RawWordLen(InpWidth), .HashLen(HashWidth), .RepeatCounterLen(RepeatCounterWidth))
                     NEW_FRAME_ASSEMBLER
-                    (.clk_i(clk_i), .rst_ni(rst_ni), .data_i(data_i), .new_frame_o(frame_o), 
+                    (.clk_i(clk_i), .rst_ni(rst_ni), .data_i(data_i), .new_frame_o(frame_o),
                      .new_frame_ready_o(new_frame_ready));
 
-    
 
-    
 endmodule : process_frame_top
 
 module process_frame_fsm #(
-    parameter int unsigned InpWidth   = 32'd32,
-    parameter int unsigned HashWidth  = 32'd5,
-    parameter int unsigned RepeatCounterWidth = 32'd4
+    parameter int unsigned InpWidth          = 32,
+    parameter int unsigned HashWidth         = 5,
+    parameter int unsigned RepeatCounterWidth = 4
 ) (
     input logic clk_i,
     input logic rst_ni,
@@ -114,7 +118,7 @@ module process_frame_fsm #(
     } current_state, next_state;
 
     always_ff @(posedge clk_i, negedge rst_ni)
-        if (rst_ni) 
+        if (rst_ni)
             current_state <= START;
         else
             current_state <= next_state;
@@ -133,6 +137,7 @@ module process_frame_fsm #(
         assemble_seen_frame_o = 0;
         send_frame_o = 0;
         ready_for_new_data_o = 1'b1;
+        seen = 1'b0;
 
         case( current_state )
             START: begin
@@ -141,9 +146,9 @@ module process_frame_fsm #(
                 counter_o = 0;
 
                 // Check if the new word's hash is already in the table
-                // Hash table and hash generator are combinational 
+                // Hash table and hash generator are combinational
                 // Do we need to wait a cycle for the hash to be generated and the table to be checked? If so, we can add a WAIT state here.
-                assign seen = hash_match_i;
+                seen = hash_match_i;
 
                 if (~data_valid_i)                      next_state = START; // Stay in START state until data is valid
                 else if (~seen && table_full_i)         next_state = TABLE_FULL;
@@ -187,7 +192,7 @@ module process_frame_fsm #(
                 counter_o = counter_o + 1;
 
                 // Prevent counter overflow
-                if (counter_o == {RepeatCounterWidth{1'b1}} || ~next_frame_same_i) 
+                if (counter_o == {RepeatCounterWidth{1'b1}} || ~next_frame_same_i)
                                                         next_state = MAKE_SEEN_FRAME;
                 else                                    next_state = CHECK_NEXT_WORD;
             end

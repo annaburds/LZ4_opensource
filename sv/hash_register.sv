@@ -1,7 +1,7 @@
 `default_nettype none
 
 module hash_register #(
-    parameter int unsigned Width = `HASH_LEN
+    parameter int unsigned Width = 5
 ) (
     input  logic clk_i,
     input  logic rst_ni,
@@ -12,9 +12,11 @@ module hash_register #(
     output logic saved_o
 );
     logic [Width-1:0] hash_reg;
+    logic [Width-1:0] hash_reg_next;
 
     assign hash_reg_next = reset_i ? '0 : (en_i ? data_i : hash_reg);
     assign q_o = hash_reg;
+    assign saved_o = 1'b1; // TODO: implement if timing requires it
 
     always_ff @(posedge clk_i or negedge rst_ni) begin
         if (!rst_ni) begin
@@ -23,7 +25,5 @@ module hash_register #(
             hash_reg <= hash_reg_next;
         end
      end
-
-     // TODO implement saved_o signal if necessary for timing
 
 endmodule : hash_register

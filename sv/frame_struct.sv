@@ -9,7 +9,11 @@
 
 package frame_pkg;
 
-typedef enum logic [7:0] { 
+localparam int unsigned HASH_LEN           = 5;
+localparam int unsigned RAW_WORD_LEN       = 32;
+localparam int unsigned REPEAT_COUNTER_LEN = 4;
+
+typedef enum logic [7:0] {
     VERSION_MSB             = 7,
     VERSION_LSB             = 6,
     BLOCK_INDEPENDENCE_FLAG = 5,
@@ -43,10 +47,10 @@ typedef struct packed {
 } frame_descriptor_t;
 
 typedef struct packed {
-    logic [31:0]                    DataSize;       // 4 bytes
-    logic [`HASH_LEN-1:0]           Hash;   
-    logic [`REPEAT_COUNTER_LEN-1:0] RepeatCounter;
-    logic [31:0]                    BlockChecksum;  // 0-4 bytes (optional, only if FLG[4] is set)
+    logic [31:0]                        DataSize;       // 4 bytes
+    logic [HASH_LEN-1:0]               Hash;
+    logic [REPEAT_COUNTER_LEN-1:0]     RepeatCounter;
+    logic [31:0]                        BlockChecksum;  // 0-4 bytes (optional, only if FLG[4] is set)
 } seen_data_block_t;
 
 typedef struct packed {
@@ -60,21 +64,21 @@ typedef struct packed {
 typedef struct packed {
     logic [31:0]                MagicNumber;
     frame_descriptor_t          FrameDescriptor;
-    logic [`RAW_WORD_LEN-1:0]   RawData;
+    logic [RAW_WORD_LEN-1:0]    RawData;
     logic [31:0]                EndMark;            // 4 bytes
     logic [31:0]                ContentChecksum;    // 0-4 bytes (optional, only if FLG[2] is set)
 } new_frame_struct_t;
 
 typedef struct packed {
-    logic [`RAW_WORD_LEN-1:0]   RawData; // for now because this is longer than the other one
+    logic [RAW_WORD_LEN-1:0]   RawData; // for now because this is longer than the other one
 } generic_data_block_t;
 
 typedef struct packed {
-    logic [31:0]                MagicNumber;
-    frame_descriptor_t          FrameDescriptor;
-    generic_data_block_t        DataBlock;
-    logic [31:0]                EndMark;            // 4 bytes
-    logic [31:0]                ContentChecksum;    // 0-4 bytes (optional, only if FLG[2] is set)
+    logic [31:0]         MagicNumber;
+    frame_descriptor_t   FrameDescriptor;
+    generic_data_block_t DataBlock;
+    logic [31:0]         EndMark;            // 4 bytes
+    logic [31:0]         ContentChecksum;    // 0-4 bytes (optional, only if FLG[2] is set)
 } generic_frame_struct_t;
 
 endpackage : frame_pkg

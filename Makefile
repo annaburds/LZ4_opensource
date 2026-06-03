@@ -2,8 +2,8 @@
 MODULE = tb_fsm
 
 SRC = \
-	sv/frame_assembler.sv \
 	sv/frame_struct.sv \
+	sv/frame_assembler.sv \
 	sv/fsm.sv \
 	sv/hash_register.sv \
 	sv/hash_table.sv \
@@ -11,7 +11,8 @@ SRC = \
 	sv/tb_fsm.sv
 
 WAIVERS = \
-	waivers/pulp_platform/sub_per_hash_waivers.vlt 
+	waivers/pulp_platform/sub_per_hash_waivers.vlt \
+	waivers/lz4/tb_fsm.vlt
 
 VERILATOR_FLAGS = \
 
