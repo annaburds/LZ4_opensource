@@ -1,0 +1,8 @@
+// Copyright 2022 OpenHW Group
+`verilator_config
+
+// Non-blocking assignments in initial/task blocks are intentional TB style
+lint_off -rule INITIALDLY -file "*tb_fsm.sv"
+
+// Case statement coverage: FSM default state handled by next_state default above case
+lint_off -rule CASEINCOMPLETE -file "*fsm.sv"

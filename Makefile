@@ -15,6 +15,7 @@ WAIVERS = \
 	waivers/lz4/tb_fsm.vlt
 
 VERILATOR_FLAGS = \
+	--trace
 
 all: build
 

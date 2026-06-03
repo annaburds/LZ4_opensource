@@ -56,8 +56,10 @@ module tb_fsm();
 
         // some simple edge cases
         data_i = 32'h0;
-        #10;
-        $display("data word 0x%h --> frame 0x%h", data_i, frame_o);
+        send_input_data(data_i);
+        receive_frame();
+        // #10;
+        // $display("data word 0x%h --> frame 0x%h", data_i, frame_o);
 
         data_i = 32'hFFFF_FFFF;
         #10;
