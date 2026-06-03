@@ -11,20 +11,20 @@
 
 `default_nettype none
 import frame_pkg::*;
+`include "tb_fsm.sv"
 
 // TODO: implement a function/task to calculate checksum values for header, block, and content
 // TODO: add parameters or inputs to set optional flags
 
 module new_frame_assembler (
-    input  logic                                    clk_i,
-    input  logic                                    rst_ni,
-    input  logic [RAW_WORD_LEN-1:0]                 data_i,
-    output logic [$bits(new_frame_struct_t)-1:0]    new_frame_o,
-    output logic                                    new_frame_ready_o
+    input  logic                     clk_i,
+    input  logic                     rst_ni,
+    input  logic [`RAW_WORD_LEN-1:0] data_i,
+    output new_frame_struct_t        new_frame_o,
+    output logic                     new_frame_ready_o
 );
     // TO DO: IMPLEMENT THE ASSEMBLY OF A NEW FRAME, WHICH CONSISTS OF THE RAW DATA WORD
     // New frame format, containing the hash and counter values
-    new_frame_struct_t new_frame_o; 
 
     initial begin
         new_frame_o = '{
@@ -66,16 +66,15 @@ module new_frame_assembler (
 endmodule : new_frame_assembler
 
 module seen_frame_assembler (
-    input  logic                                    clk_i,
-    input  logic                                    rst_ni,
-    input  logic [HASH_LEN-1:0]                     hash_i,
-    input  logic [REPEAT_COUNTER_LEN-1:0]           counter_i, // for the number of times we've seen this hash before
-    output logic [$bits(seen_frame_struct_t)-1:0]   seen_frame_o,
-    output logic                                    seen_frame_ready_o
+    input  logic                            clk_i,
+    input  logic                            rst_ni,
+    input  logic [`HASH_LEN-1:0]            hash_i,
+    input  logic [`REPEAT_COUNTER_LEN-1:0]  counter_i, // for the number of times we've seen this hash before
+    output seen_frame_struct_t              seen_frame_o,
+    output logic                            seen_frame_ready_o
 );
 
     // Seen frame format, containing the hash and counter values
-    seen_frame_struct_t seen_frame_o; 
 
     initial begin
         seen_frame_o = '{
@@ -103,7 +102,7 @@ module seen_frame_assembler (
                 HC: 8'hFF                            // TODO: replace placeholder value for header checksum
             },
             DataBlock: '{
-                DataSize: HASH_LEN + REPEAT_COUNTER_LEN, 
+                DataSize: `HASH_LEN + `REPEAT_COUNTER_LEN, 
                 Hash: hash_i,
                 RepeatCounter: counter_i
             },

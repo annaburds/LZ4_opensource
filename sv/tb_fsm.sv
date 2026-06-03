@@ -1,24 +1,26 @@
 `default_nettype none
+import frame_pkg::*;
 
-module tb_fsm#(
-    parameter int unsigned FrameWidth = 32'd32
-    parameter int unsigned InpWidth   = 32'd32,
-    parameter int unsigned HashWidth  = 32'd5
-) ();
-    logic clk_i;
-    logic rst_ni;
-    logic [InpWidth-1:0] data_i;
-    logic [FrameWidth-1:0] frame_o;
-    logic ready_for_new_data;
-    logic data_valid_i;
+`define NUM_TESTS           10
+`define HASH_LEN            32'd5 
+`define REPEAT_COUNTER_LEN  32'd4
+`define RAW_WORD_LEN        32'd32
 
-    process_frame_top #(.InpWidth(InpWidth), .HashWidth(HashWidth)) 
+module tb_fsm();
+    logic                       clk_i;
+    logic                       rst_ni;
+    logic [`RAW_WORD_LEN-1:0]   data_i;
+    generic_frame_struct_t      frame_o;
+    logic                       ready_for_new_data;
+    logic                       data_valid_i;
+
+    process_frame_top #(.InpWidth(`RAW_WORD_LEN), .HashWidth(`HASH_LEN)) 
                     DUT
                     (.clk_i(clk_i), .rst_ni(rst_ni), .data_i(data_i), .frame_o(frame_o), 
                      .ready_for_new_data_o(ready_for_new_data), .data_valid_i(data_valid_i));
 
     // Tasks for sending input data and receiving frames, to be used in the initial block for testing
-    task send_input_data(input logic [InpWidth-1:0] current_word); //, input logic [InpWidth-1:0] next_word);
+    task send_input_data(input logic [`RAW_WORD_LEN-1:0] current_word); //, input logic [InpWidth-1:0] next_word);
         data_i <= current_word;
         // data_i_next <= next_word; 
         // TODO: I'm confused about the parallelism of it all, the reading next, how is it all available at the same time?
@@ -65,7 +67,6 @@ module tb_fsm#(
         $display("data word 0x%h --> frame 0x%h", data_i, frame_o);
 
         // simulate some random streamed inputs
-        int unsigned NUM_TESTS = 10;
         repeat (NUM_TESTS) begin
             data_i = $urandom_range(32'h0, 32'hFFFF_FFFF);
             send_input_data(data_i);

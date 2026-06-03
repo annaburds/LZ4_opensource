@@ -1,7 +1,7 @@
 `default_nettype none
 
 module hash_register #(
-    parameter int unsigned Width = HASH_LEN
+    parameter int unsigned Width = `HASH_LEN
 ) (
     input  logic clk_i,
     input  logic rst_ni,

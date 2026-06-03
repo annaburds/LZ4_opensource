@@ -3,15 +3,16 @@
 // TODO: create a mode to stop compressing the data if the hash table is full and we don't want to evict anything
 
 module process_frame_top #(
-    parameter int unsigned InpWidth   = RAW_WORD_LEN,
-    parameter int unsigned HashWidth  = HASH_LEN, 
-    parameter int unsigned RepeatCounterWidth = REPEAT_COUNTER_WIDTH
+    parameter int unsigned InpWidth   = `RAW_WORD_LEN,
+    parameter int unsigned HashWidth  = `HASH_LEN, 
+    parameter int unsigned RepeatCounterWidth = `REPEAT_COUNTER_LEN
 ) (
     input  logic clk_i,
     input  logic rst_ni,
     input  logic [InpWidth-1:0] data_i,
+    input  logic data_valid_i,
     // TODO standardize frame output width
-    output logic [$max($bits(new_frame_struct_t), $bits(seen_frame_struct_t))-1:0] frame_o
+    output generic_frame_struct_t frame_o
 );
     logic new_word;
     logic table_full;
@@ -28,6 +29,7 @@ module process_frame_top #(
     logic data_valid_i;
     logic data_o;
     logic save_hash_to_register;
+    logic hash_match;
 
     process_frame_fsm #(.InpWidth(InpWidth), .HashWidth(HashWidth)) 
                     FSM
@@ -35,6 +37,7 @@ module process_frame_top #(
                      .hash_table_saved_i(hash_table_saved), .new_frame_ready_i(new_frame_ready), 
                      .hash_reg_saved_i(hash_reg_saved), .next_frame_same_i(next_frame_same), 
                      .seen_frame_ready_i(seen_frame_ready), .frame_received_i(frame_received),
+                     .hash_match_i(hash_match), .data_valid_i(data_valid_i),
                      .hash_register_reset_o(hash_register_reset), .counter_o(counter), 
                      .ready_for_new_data_o(ready_for_new_data), .evict_word_o(), .save_hash_to_table_o(), 
                      .save_hash_to_register_o(save_hash_to_register), 
@@ -48,7 +51,7 @@ module process_frame_top #(
     hash_table #(.HashWidth(HashWidth)) 
                     HASH_TABLE
                     (.clk_i(clk_i), .rst_ni(rst_ni), .hash_i(hash), .insert_i(save_hash_to_table_o), .data_i(data_i),
-                     .hash_saved_o(hash_table_saved), .table_full_o(table_full), .data_o(data_o));
+                     .hash_saved_o(hash_table_saved), .table_full_o(table_full), .data_o(data_o), .hash_match_o(hash_match));
     
     register #(.Width(HashWidth)) 
                     HASH_REGISTER
@@ -84,6 +87,8 @@ module process_frame_fsm #(
     input logic next_frame_same_i,
     input logic seen_frame_ready_i,
     input logic frame_received_i,
+    input logic hash_match_i,
+    input logic data_valid_i,
     output logic evict_word_o,
     output logic save_hash_to_table_o,
     output logic hash_register_reset_o,
@@ -138,7 +143,7 @@ module process_frame_fsm #(
                 // Check if the new word's hash is already in the table
                 // Hash table and hash generator are combinational 
                 // Do we need to wait a cycle for the hash to be generated and the table to be checked? If so, we can add a WAIT state here.
-                assign seen = data_i == data_o;
+                assign seen = hash_match_i;
 
                 if (~data_valid_i)                      next_state = START; // Stay in START state until data is valid
                 else if (~seen && table_full_i)         next_state = TABLE_FULL;
