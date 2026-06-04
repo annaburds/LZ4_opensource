@@ -26,6 +26,7 @@ module tb_fsm();
     task send_input_data(input logic [`RAW_WORD_LEN-1:0] current_word);
         data_i <= current_word;
         data_valid_i <= 1;
+        @(posedge clk_i);
         @(posedge clk_i iff (ready_for_new_data)); // wait for the frame to be ready before sending the next word
         data_valid_i <= 0;
     endtask
@@ -33,9 +34,9 @@ module tb_fsm();
     task receive_frame();
         @(posedge clk_i iff (send_frame_o != 0)); // wait for a frame to be output
         $display("data word 0x%h --> frame 0x%h", data_i, frame_o);
-        frame_received_i <= 1; // signal that frame is successfully received
+        frame_received_i = 1; // signal that frame is successfully received
         @(posedge clk_i);
-        frame_received_i <= 0;
+        frame_received_i = 0;
     endtask
 
     // Clock generation and reset, test sequence
@@ -43,6 +44,16 @@ module tb_fsm();
         // verilator
         $dumpfile("wave.vcd");
         $dumpvars(0, tb_fsm);
+
+        // monitor + print outputs
+        $monitor($time,,
+            "data = %h, frame = %h, ready_for_new_data = %b, data_valid = %b, send_frame = %b, frame_received = %b, \
+            s = %s, ns = %s, \
+            hash = %b, hash_match = %b, save_hash_to_table = %b",
+            data_i, frame_o, ready_for_new_data, data_valid_i, send_frame_o, frame_received_i, 
+            DUT.FSM.current_state.name, DUT.FSM.next_state.name,
+            DUT.hash, DUT.hash_match,
+            DUT.save_hash_to_table);
 
         // reset
         clk_i <= 0;
@@ -58,15 +69,16 @@ module tb_fsm();
         data_i = 32'h0;
         send_input_data(data_i);
         receive_frame();
-        // #10;
-        // $display("data word 0x%h --> frame 0x%h", data_i, frame_o);
+        $display("data word 0x%h --> frame 0x%h", data_i, frame_o);
 
         data_i = 32'hFFFF_FFFF;
-        #10;
+        send_input_data(data_i);
+        receive_frame();
         $display("data word 0x%h --> frame 0x%h", data_i, frame_o);
 
         data_i = 32'hDEAD_BEEF;
-        #10;
+        send_input_data(data_i);
+        receive_frame();
         $display("data word 0x%h --> frame 0x%h", data_i, frame_o);
 
         // simulate some random streamed inputs

@@ -117,11 +117,12 @@ module process_frame_fsm #(
         SEND_FRAME
     } current_state, next_state;
 
-    always_ff @(posedge clk_i, negedge rst_ni)
-        if (rst_ni)
+    always_ff @(posedge clk_i, negedge rst_ni) begin
+        if (!rst_ni)
             current_state <= START;
         else
             current_state <= next_state;
+    end
 
     // Next state and output logic
     always_comb begin
