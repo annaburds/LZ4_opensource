@@ -32,6 +32,9 @@ module process_frame_top #(
     logic save_hash_to_register;
     logic hash_match;
     logic save_hash_to_table;
+    logic assemble_new_frame;
+    generic_frame_struct_t new_frame;
+    generic_frame_struct_t seen_frame;
 
     assign ready_for_new_data_o = ready_for_new_data;
 
@@ -46,7 +49,7 @@ module process_frame_top #(
                      .ready_for_new_data_o(ready_for_new_data), .evict_word_o(),
                      .save_hash_to_table_o(save_hash_to_table),
                      .save_hash_to_register_o(save_hash_to_register),
-                     .assemble_new_frame_o(), .assemble_seen_frame_o(),
+                     .assemble_new_frame_o(assemble_new_frame), .assemble_seen_frame_o(),
                      .send_frame_o(send_frame_o));
 
     sub_per_hash #(.InpWidth(InpWidth), .HashWidth(HashWidth))
@@ -67,12 +70,16 @@ module process_frame_top #(
     seen_frame_assembler #(.RawWordLen(InpWidth), .HashLen(HashWidth), .RepeatCounterLen(RepeatCounterWidth))
                     SEEN_FRAME_ASSEMBLER
                     (.clk_i(clk_i), .rst_ni(rst_ni), .hash_i(hash), .counter_i(counter),
-                     .seen_frame_o(frame_o), .seen_frame_ready_o(seen_frame_ready));
+                     .seen_frame_o(seen_frame), .seen_frame_ready_o(seen_frame_ready));
 
     new_frame_assembler #(.RawWordLen(InpWidth), .HashLen(HashWidth), .RepeatCounterLen(RepeatCounterWidth))
                     NEW_FRAME_ASSEMBLER
-                    (.clk_i(clk_i), .rst_ni(rst_ni), .data_i(data_i), .new_frame_o(frame_o),
+                    (.clk_i(clk_i), .rst_ni(rst_ni), .data_i(data_i), .new_frame_o(new_frame),
                      .new_frame_ready_o(new_frame_ready));
+
+    frame_mux #(.Width($bits(generic_frame_struct_t)))
+                    FRAME_MUX
+                    (.a(new_frame), .b(seen_frame), .sel(assemble_new_frame), .o(frame_o));
 
 
 endmodule : process_frame_top

@@ -4,6 +4,7 @@ MODULE = tb_fsm
 SRC = \
 	sv/frame_struct.sv \
 	sv/frame_assembler.sv \
+	sv/frame_mux.sv \
 	sv/fsm.sv \
 	sv/hash_register.sv \
 	sv/hash_table.sv \
