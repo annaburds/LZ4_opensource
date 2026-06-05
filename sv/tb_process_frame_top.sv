@@ -17,6 +17,7 @@ module tb_process_frame_top();
     logic                       frame_received_i;
     logic                       repeat_variable;
     logic [30:0]                unused_bits;
+    logic [3:0]                 loop_count;
 
     process_frame_top #(.InpWidth(`RAW_WORD_LEN), .HashWidth(`HASH_LEN), .RepeatCounterWidth(`REPEAT_COUNTER_LEN))
                     DUT
@@ -100,11 +101,13 @@ module tb_process_frame_top();
 
             // A random boolean to decide whether the next word is the same or not, and send again if so
             // To test counter
+            loop_count = 0;
             {unused_bits, repeat_variable} = $urandom();
-            if (repeat_variable) begin 
+            while (repeat_variable && loop_count < 4) begin 
                 $display("--------- repeating data ---------");
                 send_input_data(data_i);
                 receive_frame();
+                loop_count = loop_count + 1;
             end 
         end
 
