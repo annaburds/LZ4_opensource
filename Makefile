@@ -5,15 +5,15 @@ SRC = \
 	sv/frame_struct.sv \
 	sv/frame_assembler.sv \
 	sv/frame_mux.sv \
-	sv/fsm.sv \
+	sv/process_frame_top.sv \
 	sv/hash_register.sv \
 	sv/hash_table.sv \
 	sv/sub_per_hash.sv \
-	sv/tb_fsm.sv
+	sv/tb_process_frame_top.sv
 
 WAIVERS = \
 	waivers/pulp_platform/sub_per_hash_waivers.vlt \
-	waivers/lz4/tb_fsm.vlt
+	waivers/lz4/tb_process_frame_top.vlt
 
 VERILATOR_FLAGS = \
 	--trace
