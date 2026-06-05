@@ -1,28 +1,30 @@
 `default_nettype none
 
 module hash_register #(
-    parameter int unsigned Width = 5
+    parameter int unsigned HashWidth = 5,
+    parameter int unsigned DataWidth = 32
 ) (
     input  logic clk_i,
     input  logic rst_ni,
-    input  logic [Width-1:0] data_i,
-    input  logic en_i,
-    input  logic reset_i,
-    output logic [Width-1:0] q_o,
-    output logic saved_o
-);
-    logic [Width-1:0] hash_reg;
-    logic [Width-1:0] hash_reg_next;
+    input  logic load_i,
 
-    assign hash_reg_next = reset_i ? '0 : (en_i ? data_i : hash_reg);
-    assign q_o = hash_reg;
-    assign saved_o = 1'b1; // TODO: implement if timing requires it
+    input  logic [DataWidth-1:0] data_i,
+    input  logic [HashWidth-1:0] hash_i,
+
+    output logic [DataWidth-1:0] data_o,
+    output logic [HashWidth-1:0] hash_o
+);
+    // logic [HashWidth-1:0] hash_reg;
+    // logic [DataWidth-1:0] data_reg;
 
     always_ff @(posedge clk_i or negedge rst_ni) begin
         if (!rst_ni) begin
-            hash_reg <= '0;
-        end else begin
-            hash_reg <= hash_reg_next;
+            hash_o <= '0;
+            data_o <= '0;
+        end 
+        else if (load_i) begin
+            hash_o <= hash_i;
+            data_o <= data_i;
         end
      end
 

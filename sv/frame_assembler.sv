@@ -29,7 +29,7 @@ module new_frame_assembler #(
     // TO DO: IMPLEMENT THE ASSEMBLY OF A NEW FRAME, WHICH CONSISTS OF THE RAW DATA WORD
     // New frame format, containing the hash and counter values
 
-    initial begin
+    always_comb begin
         new_frame_o = '{
             MagicNumber: 32'h184D_2204,
             FrameDescriptor: '{
@@ -84,7 +84,7 @@ module seen_frame_assembler #(
 );
 
     // Seen frame format: hash and counter packed into RawData field
-    initial begin
+    always_comb begin
         seen_frame_o = '{
             MagicNumber: 32'h184D_2204,
             FrameDescriptor: '{

@@ -49,10 +49,10 @@ module tb_fsm();
         $monitor($time,,
             "data = %h, frame = %h, ready_for_new_data = %b, data_valid = %b, send_frame = %b, frame_received = %b, \
             s = %s, ns = %s, \
-            hash = %b, hash_match = %b, save_hash_to_table = %b",
+            hash = %b, reg data = %h, hash_match = %b, save_hash_to_table = %b",
             data_i, frame_o, ready_for_new_data, data_valid_i, send_frame_o, frame_received_i, 
             DUT.FSM.current_state.name, DUT.FSM.next_state.name,
-            DUT.hash, DUT.hash_match,
+            DUT.hash, DUT.HASH_REGISTER.data_o, DUT.hash_match,
             DUT.save_hash_to_table);
 
         // reset
@@ -66,6 +66,11 @@ module tb_fsm();
         #2 rst_ni <= 1;
 
         // some simple edge cases
+        data_i = 32'h0;
+        send_input_data(data_i);
+        receive_frame();
+        $display("data word 0x%h --> frame 0x%h", data_i, frame_o);
+
         data_i = 32'h0;
         send_input_data(data_i);
         receive_frame();
