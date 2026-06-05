@@ -1,5 +1,5 @@
 
-MODULE = tb_fsm
+MODULE = tb_process_frame_top
 
 SRC = \
 	sv/frame_struct.sv \

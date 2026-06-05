@@ -35,46 +35,76 @@ module process_frame_top #(
 
     process_frame_fsm #(.InpWidth(InpWidth), .HashWidth(HashWidth))
                     FSM
-                    (.clk_i(clk_i), .rst_ni(rst_ni), .table_full_i(table_full),
-                     .hash_table_saved_i(hash_table_saved), .new_frame_ready_i(new_frame_ready),
+                    (.clk_i(clk_i), .rst_ni(rst_ni), 
+                     .table_full_i(table_full),
+                     .hash_table_saved_i(hash_table_saved), 
+                     .new_frame_ready_i(new_frame_ready),
                      .next_frame_same_i(next_frame_same),
-                     .seen_frame_ready_i(seen_frame_ready), .frame_received_i(frame_received_i),
-                     .hash_match_i(hash_match), .data_valid_i(data_valid_i),
+                     .seen_frame_ready_i(seen_frame_ready), 
+                     .frame_received_i(frame_received_i),
+                     .hash_match_i(hash_match), 
+                     .data_valid_i(data_valid_i),
                      .counter_o(counter),
-                     .ready_for_new_data_o(ready_for_new_data), .evict_word_o(),
+                     .ready_for_new_data_o(ready_for_new_data), 
+                     .evict_word_o(),
                      .save_hash_to_table_o(save_hash_to_table),
                      .save_hash_to_register_o(save_hash_to_register),
-                     .assemble_new_frame_o(assemble_new_frame), .assemble_seen_frame_o(),
+                     .assemble_new_frame_o(assemble_new_frame), 
+                     .assemble_seen_frame_o(),
                      .send_frame_o(send_frame_o));
 
     sub_per_hash #(.InpWidth(InpWidth), .HashWidth(HashWidth))
                     HASH_GENERATOR
-                    (.data_i(data_i), .hash_o(hash), .hash_onehot_o());
+                    (.data_i(data_i), 
+                     .hash_o(hash), 
+                     .hash_onehot_o());
 
     // TO DO: IMPLEMENT HASH TABLE AND HASH REGISTER MODULES
     hash_table #(.HashLen(HashWidth), .RawWordLen(InpWidth))
                     HASH_TABLE
-                    (.clk_i(clk_i), .rst_ni(rst_ni), .hash_i(hash), .insert_i(save_hash_to_table), .data_i(data_i),
-                     .hash_saved_o(hash_table_saved), .table_full_o(table_full), .data_o(data_o), .hash_match_o(hash_match));
+                    (.clk_i(clk_i), 
+                     .rst_ni(rst_ni), 
+                     .hash_i(hash), 
+                     .insert_i(save_hash_to_table), 
+                     .data_i(data_i),
+                     .hash_saved_o(hash_table_saved), 
+                     .table_full_o(table_full), 
+                     .data_o(data_o), 
+                     .hash_match_o(hash_match));
 
     hash_register #(.HashWidth(HashWidth), .DataWidth(InpWidth))
                     HASH_REGISTER
-                    (.clk_i(clk_i), .rst_ni(rst_ni), .data_i(data_i), .hash_i(hash), .load_i(save_hash_to_register),
-                     .data_o(register_data), .hash_o(register_hash));
+                    (.clk_i(clk_i), 
+                     .rst_ni(rst_ni), 
+                     .data_i(data_i), 
+                     .hash_i(hash), 
+                     .load_i(save_hash_to_register),
+                     .data_o(register_data), 
+                     .hash_o(register_hash));
 
     seen_frame_assembler #(.RawWordLen(InpWidth), .HashLen(HashWidth), .RepeatCounterLen(RepeatCounterWidth))
                     SEEN_FRAME_ASSEMBLER
-                    (.clk_i(clk_i), .rst_ni(rst_ni), .hash_i(register_hash), .counter_i(counter),
-                     .seen_frame_o(seen_frame), .seen_frame_ready_o(seen_frame_ready));
+                    (.clk_i(clk_i), 
+                     .rst_ni(rst_ni), 
+                     .hash_i(register_hash), 
+                     .counter_i(counter),
+                     .seen_frame_o(seen_frame), 
+                     .seen_frame_ready_o(seen_frame_ready));
 
     new_frame_assembler #(.RawWordLen(InpWidth), .HashLen(HashWidth), .RepeatCounterLen(RepeatCounterWidth))
                     NEW_FRAME_ASSEMBLER
-                    (.clk_i(clk_i), .rst_ni(rst_ni), .data_i(register_data), .new_frame_o(new_frame),
+                    (.clk_i(clk_i), 
+                     .rst_ni(rst_ni), 
+                     .data_i(register_data), 
+                     .new_frame_o(new_frame),
                      .new_frame_ready_o(new_frame_ready));
 
     frame_mux #(.Width($bits(generic_frame_struct_t)))
                     FRAME_MUX
-                    (.a(new_frame), .b(seen_frame), .sel(assemble_new_frame), .o(frame_o));
+                    (.a(new_frame), 
+                     .b(seen_frame), 
+                     .sel(assemble_new_frame), 
+                     .o(frame_o));
 
 
 endmodule : process_frame_top
@@ -214,6 +244,10 @@ module process_frame_fsm #(
                     ready_for_new_data_o = 1'b1;        // Ready for new data after sending the frame
                 end
                 else                                    next_state = SEND_FRAME;
+            end
+            default: begin
+                // Should never enter this case
+                                                        next_state = START;
             end
         endcase
     end
