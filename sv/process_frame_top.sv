@@ -26,8 +26,8 @@ module process_frame_top #(
 
     logic new_frame_ready, seen_frame_ready;
     logic next_word_same;
-    logic assemble_new_frame;
-    generic_frame_struct_t new_frame, seen_frame;
+    logic assemble_new_frame, assemble_seen_frame;
+    generic_frame_struct_t new_frame, seen_frame, frame;
     
     logic [WordLen-1:0] data_o, register_data, data_word_i;
     logic [HashWidth-1:0] hash, register_hash;
@@ -56,7 +56,7 @@ module process_frame_top #(
                      .save_hash_to_table_o(save_hash_to_table),
                      .save_hash_to_register_o(save_hash_to_register),
                      .assemble_new_frame_o(assemble_new_frame), 
-                     .assemble_seen_frame_o(),
+                     .assemble_seen_frame_o(assemble_seen_frame),
                      .send_frame_o(send_frame_o));
 
     sub_per_hash #(.InpWidth(WordLen), .HashWidth(HashWidth))
@@ -110,7 +110,16 @@ module process_frame_top #(
                     (.a(new_frame), 
                      .b(seen_frame), 
                      .sel(assemble_new_frame), 
-                     .o(frame_o));
+                     .o(frame));
+                    
+
+    frame_register #(.Width($bits(generic_frame_struct_t)))
+                    FRAME_REG
+                    (.clk_i(clk_i), 
+                     .rst_ni(rst_ni), 
+                     .data_i(frame), 
+                     .load_i(assemble_new_frame || assemble_seen_frame),
+                     .data_o(frame_o));
 
 
 endmodule : process_frame_top
@@ -142,7 +151,6 @@ module process_frame_fsm #(
     output logic [RepeatCounterLen-1:0] counter_q,
     output logic ready_for_new_data_o
 );
-    logic                           seen;
     logic [WordLen-1:0]             word_index_q, word_index_next;
     logic                           next_word_same;
     logic [WordLen-1:0]             next_data_word;
@@ -187,7 +195,6 @@ module process_frame_fsm #(
         assemble_seen_frame_o = 0;
         send_frame_o = 0;
         ready_for_new_data_o = 1'b1;
-        seen = 1'b0;
         next_data_word = 0;
         next_word_same = 0;
         word_index_next = word_index_q;
@@ -203,12 +210,11 @@ module process_frame_fsm #(
                 // Check if the new word's hash is already in the table
                 // Hash table and hash generator are combinational
                 // Do we need to wait a cycle for the hash to be generated and the table to be checked? If so, we can add a WAIT state here.
-                seen = hash_match_i;
                 if (data_valid_i) save_hash_to_register_o = 1;
 
                 if (~data_valid_i)                      next_state = START; // Stay in START state until data is valid
-                else if (~seen && table_full_i)         next_state = TABLE_FULL;
-                else if (~seen)                         next_state = NEW_WORD;
+                else if (~hash_match_i && table_full_i)    next_state = TABLE_FULL;
+                else if (~hash_match_i)                    next_state = NEW_WORD;
                 else                                    next_state = SEEN_WORD;
             end
             TABLE_FULL: begin

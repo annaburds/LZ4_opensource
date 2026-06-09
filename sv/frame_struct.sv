@@ -11,7 +11,7 @@ package frame_pkg;
 
 localparam int unsigned HASH_LEN           = 5;
 localparam int unsigned RAW_WORD_LEN       = 32;
-localparam int unsigned REPEAT_COUNTER_LEN = 4;
+localparam int unsigned REPEAT_COUNTER_LEN = 32;
 
 typedef enum logic [7:0] {
     VERSION_MSB             = 7,

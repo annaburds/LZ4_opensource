@@ -5,6 +5,7 @@ SRC = \
 	sv/frame_struct.sv \
 	sv/frame_assembler.sv \
 	sv/frame_mux.sv \
+	sv/frame_register.sv \
 	sv/process_frame_top.sv \
 	sv/hash_register.sv \
 	sv/hash_table.sv \

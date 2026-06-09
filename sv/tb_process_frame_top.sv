@@ -2,7 +2,7 @@
 import frame_pkg::*;
 
 `define NUM_TESTS           10
-`define HASH_LEN            32'd5
+`define HASH_LEN            32'd7
 `define REPEAT_COUNTER_LEN  32'd32
 `define RAW_WORD_LEN        32'd32
 `define DATA_STREAM_LEN     32'd1024
@@ -55,13 +55,15 @@ module tb_process_frame_top();
         $display("reg_data = %h, reg_hash = %h, fsm_counter = %d \
             s = %s, ns = %s, \
             hash_match(seen) = %b, save_hash_to_table = %b \
+            frame = %h \
             \
             ",
             DUT.HASH_REGISTER.data_o, DUT.HASH_REGISTER.hash_o, DUT.counter,
             // ready_for_new_data, send_frame_o, frame_received_i, 
             DUT.FSM.current_state.name, DUT.FSM.next_state.name,
             DUT.hash_match,
-            DUT.save_hash_to_table);
+            DUT.save_hash_to_table, 
+            frame_o);
         @(posedge clk_i);
         frame_received_i = 1; // signal that frame is successfully received
         receive_count = receive_count + 1;
