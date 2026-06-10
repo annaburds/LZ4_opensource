@@ -2,10 +2,11 @@
 import frame_pkg::*;
 
 `define NUM_TESTS           10
-`define HASH_LEN            8
-`define REPEAT_COUNTER_LEN  8
-`define RAW_WORD_LEN        64
+`define HASH_LEN            16
+`define REPEAT_COUNTER_LEN  16
+`define RAW_WORD_LEN        32
 `define DATA_STREAM_LEN     2048
+`define POSITION_LEN        16 // 2 bytes
 
 module tb_process_frame_top();
     logic                       clk_i;
@@ -23,7 +24,11 @@ module tb_process_frame_top();
     logic [`RAW_WORD_LEN-1:0]   receive_count;
     logic [`RAW_WORD_LEN-1:0]   send_count;
 
-    process_frame_top #(.WordLen(`RAW_WORD_LEN), .StreamLen(`DATA_STREAM_LEN), .HashWidth(`HASH_LEN), .RepeatCounterWidth(`REPEAT_COUNTER_LEN))
+    process_frame_top #(.WordLen(`RAW_WORD_LEN), 
+                        .StreamLen(`DATA_STREAM_LEN), 
+                        .HashWidth(`HASH_LEN), 
+                        .RepeatCounterWidth(`REPEAT_COUNTER_LEN),
+                        .PositionLen(`POSITION_LEN))
                     DUT
                     (.clk_i(clk_i), .rst_ni(rst_ni), .data_stream_i(data_stream_i), .frame_o(frame_o),
                      .ready_for_new_data_o(ready_for_new_data), .data_valid_i(data_valid_i),
@@ -50,12 +55,14 @@ module tb_process_frame_top();
         @(posedge clk_i iff (send_frame_o != 0)); // wait for a frame to be output
 
         $display("reg_data = %h, reg_hash = %h, fsm_counter = %d \
+            seen at position = %h = %d, currently at %d \
             s = %s, ns = %s, \
             hash_match(seen) = %b, save_hash_to_table = %b \
             frame = %h \
             \
             ",
             DUT.HASH_REGISTER.data_o, DUT.HASH_REGISTER.hash_o, DUT.counter,
+            DUT.HASH_REGISTER.position_o, DUT.HASH_REGISTER.position_o, DUT.FSM.word_index_q,
             // ready_for_new_data, send_frame_o, frame_received_i, 
             DUT.FSM.current_state.name, DUT.FSM.next_state.name,
             DUT.hash_match,

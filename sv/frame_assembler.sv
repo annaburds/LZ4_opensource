@@ -16,9 +16,7 @@ import frame_pkg::*;
 // TODO: add parameters or inputs to set optional flags
 
 module new_frame_assembler #(
-    parameter int unsigned RawWordLen       = 32,
-    parameter int unsigned HashLen          = 8,
-    parameter int unsigned RepeatCounterLen = 32
+    parameter int unsigned RawWordLen       = 32
 ) (
     input  logic                       clk_i,
     input  logic                       rst_ni,
@@ -72,12 +70,12 @@ endmodule : new_frame_assembler
 
 module seen_frame_assembler #(
     parameter int unsigned RawWordLen       = 32,
-    parameter int unsigned HashLen          = 5,
+    parameter int unsigned PositionLen      = 16,
     parameter int unsigned RepeatCounterLen = 4
 ) (
     input  logic                            clk_i,
     input  logic                            rst_ni,
-    input  logic [HashLen-1:0]              hash_i,
+    input  logic [PositionLen-1:0]              position_i,
     input  logic [RepeatCounterLen-1:0]     counter_i, // for the number of times we've seen this hash before
     output generic_frame_struct_t           seen_frame_o,
     output logic                            seen_frame_ready_o
@@ -113,7 +111,7 @@ module seen_frame_assembler #(
                 HC:           8'hFF     // TODO: replace placeholder header checksum
             },
             DataBlock: '{
-                RawData: RawWordLen'({hash_i, counter_i})
+                RawData: RawWordLen'({position_i, counter_i})
             },
             EndMark:         32'h0000_0000,
             ContentChecksum: 32'hFFFF_FFFF  // TODO: replace placeholder

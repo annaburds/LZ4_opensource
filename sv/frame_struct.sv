@@ -9,9 +9,9 @@
 
 package frame_pkg;
 
-localparam int unsigned HASH_LEN           = 8;
-localparam int unsigned RAW_WORD_LEN       = 64;
-localparam int unsigned REPEAT_COUNTER_LEN = 8;
+localparam int unsigned HASH_LEN           = 16;
+localparam int unsigned RAW_WORD_LEN       = 32;
+localparam int unsigned REPEAT_COUNTER_LEN = 16;
 
 typedef enum logic [7:0] {
     VERSION_MSB             = 7,

@@ -6,19 +6,19 @@ module process_frame_top #(
     parameter int unsigned WordLen             = 64,
     parameter int unsigned StreamLen           = 1024,
     parameter int unsigned HashWidth           = 8,
-    parameter int unsigned RepeatCounterWidth  = 8
+    parameter int unsigned RepeatCounterWidth  = 16,
+    parameter int unsigned PositionLen         = 16
 ) (
-    input  logic clk_i,
-    input  logic rst_ni,
-    input  logic [StreamLen-1:0] data_stream_i,
-    input  logic data_valid_i,
-    input  logic frame_received_i,
-    output generic_frame_struct_t frame_o,
-    output logic ready_for_new_data_o,
-    output logic send_frame_o
+    input  logic                    clk_i,
+    input  logic                    rst_ni,
+    input  logic [StreamLen-1:0]    data_stream_i,
+    input  logic                    data_valid_i,
+    input  logic                    frame_received_i,
+    output generic_frame_struct_t   frame_o,
+    output logic                    ready_for_new_data_o,
+    output logic                    send_frame_o
 );
     logic table_full;
-    logic hash_table_saved;
     logic save_hash_to_register;
     logic hash_match;
     logic save_hash_to_table;
@@ -28,16 +28,20 @@ module process_frame_top #(
     logic assemble_new_frame, assemble_seen_frame;
     generic_frame_struct_t new_frame, seen_frame, frame;
     
-    logic [WordLen-1:0] data_o, register_data, data_word_i;
-    logic [HashWidth-1:0] hash, register_hash;
+    logic [WordLen-1:0]     data_o, register_data, data_word_i;
+    logic [HashWidth-1:0]   hash, register_hash;
+    logic [PositionLen-1:0] position, hashed_position, register_position;
 
     logic [RepeatCounterWidth-1:0] counter;
 
-    process_frame_fsm #(.WordLen(WordLen), .StreamLen(StreamLen), .HashWidth(HashWidth))
+    process_frame_fsm #(.WordLen(WordLen), 
+                        .StreamLen(StreamLen), 
+                        .HashWidth(HashWidth), 
+                        .RepeatCounterLen(RepeatCounterWidth),
+                        .PositionLen(PositionLen))
                     FSM
                     (.clk_i(clk_i), .rst_ni(rst_ni), 
                      .table_full_i(table_full),
-                     .hash_table_saved_i(hash_table_saved), 
                      .new_frame_ready_i(new_frame_ready),
                      .seen_frame_ready_i(seen_frame_ready), 
                      .frame_received_i(frame_received_i),
@@ -52,7 +56,8 @@ module process_frame_top #(
                      .save_hash_to_register_o(save_hash_to_register),
                      .assemble_new_frame_o(assemble_new_frame), 
                      .assemble_seen_frame_o(assemble_seen_frame),
-                     .send_frame_o(send_frame_o));
+                     .send_frame_o(send_frame_o), 
+                     .position_q(position));
 
     sub_per_hash #(.InpWidth(WordLen), .HashWidth(HashWidth))
                     HASH_GENERATOR
@@ -66,10 +71,9 @@ module process_frame_top #(
                      .rst_ni(rst_ni), 
                      .hash_i(hash), 
                      .insert_i(save_hash_to_table), 
-                     .data_i(data_word_i),
-                     .hash_saved_o(hash_table_saved), 
+                     .position_i(position),
                      .table_full_o(table_full), 
-                     .data_o(data_o), 
+                     .position_o(hashed_position), 
                      .hash_match_o(hash_match));
 
     hash_register #(.HashWidth(HashWidth), .DataWidth(WordLen))
@@ -78,20 +82,22 @@ module process_frame_top #(
                      .rst_ni(rst_ni), 
                      .data_i(data_word_i), 
                      .hash_i(hash), 
+                     .position_i(hashed_position),
                      .load_i(save_hash_to_register),
                      .data_o(register_data), 
-                     .hash_o(register_hash));
+                     .hash_o(register_hash), 
+                     .position_o(register_position));
 
-    seen_frame_assembler #(.RawWordLen(WordLen), .HashLen(HashWidth), .RepeatCounterLen(RepeatCounterWidth))
+    seen_frame_assembler #(.RawWordLen(WordLen), .PositionLen(PositionLen), .RepeatCounterLen(RepeatCounterWidth))
                     SEEN_FRAME_ASSEMBLER
                     (.clk_i(clk_i), 
                      .rst_ni(rst_ni), 
-                     .hash_i(register_hash), 
+                     .position_i(register_position), 
                      .counter_i(counter),
                      .seen_frame_o(seen_frame), 
                      .seen_frame_ready_o(seen_frame_ready));
 
-    new_frame_assembler #(.RawWordLen(WordLen), .HashLen(HashWidth), .RepeatCounterLen(RepeatCounterWidth))
+    new_frame_assembler #(.RawWordLen(WordLen))
                     NEW_FRAME_ASSEMBLER
                     (.clk_i(clk_i), 
                      .rst_ni(rst_ni), 
@@ -122,29 +128,33 @@ module process_frame_fsm #(
     parameter int unsigned StreamLen          = 1024,
     parameter int unsigned HashWidth          = 8,
     parameter int unsigned RepeatCounterLen   = 8,
-    parameter int unsigned WordIndexLen       = StreamLen/WordLen
+    parameter int unsigned WordIndexLen       = StreamLen/WordLen,
+    parameter int unsigned PositionLen        = 16
 ) (
-    input logic clk_i,
-    input logic rst_ni,
-    input logic table_full_i,
-    input logic hash_table_saved_i,
-    input logic new_frame_ready_i,
-    input logic seen_frame_ready_i,
-    input logic frame_received_i,
-    input logic hash_match_i,
-    input logic data_valid_i,
-    input logic [StreamLen-1:0]     data_stream_i,
-    output logic [WordLen-1:0]      data_word_i,
-    output logic evict_word_o,
-    output logic save_hash_to_table_o,
-    output logic save_hash_to_register_o,
-    output logic assemble_new_frame_o,
-    output logic assemble_seen_frame_o,
-    output logic send_frame_o,
+    input  logic                        clk_i,
+    input  logic                        rst_ni,
+
+    input  logic                        table_full_i,
+    input  logic                        new_frame_ready_i,
+    input  logic                        seen_frame_ready_i,
+    input  logic                        frame_received_i,
+    input  logic                        hash_match_i,
+    input  logic                        data_valid_i,
+    input  logic [StreamLen-1:0]        data_stream_i,
+
+    output logic [WordLen-1:0]          data_word_i,
+    output logic                        evict_word_o,
+    output logic                        save_hash_to_table_o,
+    output logic                        save_hash_to_register_o,
+    output logic                        assemble_new_frame_o,
+    output logic                        assemble_seen_frame_o,
+    output logic                        send_frame_o,
     output logic [RepeatCounterLen-1:0] counter_q,
-    output logic ready_for_new_data_o
+    output logic                        ready_for_new_data_o,
+    output logic [PositionLen-1:0]      position_q
 );
-    logic [WordIndexLen-1:0]        word_index_q, word_index_next; // TODO arithmetic to adjust length accurately
+    logic [WordIndexLen-1:0]        word_index_q, word_index_next;
+    logic [PositionLen-1:0]         position_next;
     logic                           next_word_same;
     logic [WordLen-1:0]             next_data_word;
     logic [RepeatCounterLen-1:0]    counter_next;
@@ -165,15 +175,17 @@ module process_frame_fsm #(
         if (!rst_ni) begin
             current_state   <= START;
             word_index_q    <= 0;
+            position_q      <= 0;
             counter_q       <= 1;
         end else begin
             current_state   <= next_state;
             word_index_q    <= word_index_next;
             counter_q       <= counter_next;
+            position_q      <= position_next;
         end
     end
 
-    assign data_word_i = data_stream_i[word_index_q*WordLen +: WordLen];
+    assign data_word_i = data_stream_i[$clog2(StreamLen)'(word_index_q*WordLen) +: WordLen];
 
     // Next state and output logic
     always_comb begin
@@ -191,6 +203,7 @@ module process_frame_fsm #(
         next_word_same = 0;
         word_index_next = word_index_q;
         counter_next = counter_q;
+        position_next = position_q;
 
         case( current_state )
             START: begin
@@ -219,7 +232,7 @@ module process_frame_fsm #(
                 // Save hash to the hash table
                 save_hash_to_table_o = 1'b1;
 
-                if (hash_table_saved_i)                 next_state = MAKE_NEW_FRAME;
+                if (hash_match_i)                       next_state = MAKE_NEW_FRAME;
                 else                                    next_state = NEW_WORD;
             end
             MAKE_NEW_FRAME: begin
@@ -268,6 +281,7 @@ module process_frame_fsm #(
                     send_frame_o = 1'b0;                // Stop sending frame after it has been received
                     ready_for_new_data_o = 1'b1;        // Ready for new data after sending the frame
                     word_index_next = word_index_q + WordIndexLen'(counter_q);
+                    position_next   = position_q + PositionLen'(counter_q);
                 end
                 else                                    next_state = SEND_FRAME;
             end
