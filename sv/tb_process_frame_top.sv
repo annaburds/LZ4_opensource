@@ -2,10 +2,10 @@
 import frame_pkg::*;
 
 `define NUM_TESTS           10
-`define HASH_LEN            32'd7
-`define REPEAT_COUNTER_LEN  32'd32
-`define RAW_WORD_LEN        32'd32
-`define DATA_STREAM_LEN     32'd1024
+`define HASH_LEN            8
+`define REPEAT_COUNTER_LEN  8
+`define RAW_WORD_LEN        64
+`define DATA_STREAM_LEN     2048ontr
 
 module tb_process_frame_top();
     logic                       clk_i;
@@ -33,7 +33,7 @@ module tb_process_frame_top();
     task add_input_data(input logic [`RAW_WORD_LEN-1:0] current_word);
         if (`RAW_WORD_LEN * (send_count + 1) < `DATA_STREAM_LEN) begin 
             data_i <= current_word;
-            data_stream_i [send_count * `RAW_WORD_LEN +: `RAW_WORD_LEN] = current_word;
+            data_stream_i [$bits(`DATA_STREAM_LEN)'(send_count * `RAW_WORD_LEN) +: `RAW_WORD_LEN] = current_word;
             $display("adding %h at index %d\ ", current_word, send_count);
             send_count = send_count + 1;
         end 
@@ -48,10 +48,7 @@ module tb_process_frame_top();
 
     task receive_frame(input logic [`RAW_WORD_LEN-1:0] index);
         @(posedge clk_i iff (send_frame_o != 0)); // wait for a frame to be output
-        // $display("data word 0x%h --> frame 0x%h \
-        // --------- message received ---------\
-        // \
-        // ", data_stream_i[`RAW_WORD_LEN*index +: `RAW_WORD_LEN], frame_o);
+
         $display("reg_data = %h, reg_hash = %h, fsm_counter = %d \
             s = %s, ns = %s, \
             hash_match(seen) = %b, save_hash_to_table = %b \
@@ -64,6 +61,7 @@ module tb_process_frame_top();
             DUT.hash_match,
             DUT.save_hash_to_table, 
             frame_o);
+        
         @(posedge clk_i);
         frame_received_i = 1; // signal that frame is successfully received
         receive_count = receive_count + 1;
@@ -71,26 +69,19 @@ module tb_process_frame_top();
         frame_received_i = 0;
     endtask
 
+    // Random number generator that works for bit width > 32
+    function automatic logic [`RAW_WORD_LEN-1:0] rand_word();
+        logic [`RAW_WORD_LEN-1:0] result;
+        for (int i = 0; i < (`RAW_WORD_LEN + 31) / 32; i++)
+            result[i*32 +: 32] = $urandom();  // fill 32 bits at a time
+        return result;
+    endfunction
+
     // Clock generation and reset, test sequence
     initial begin
         // verilator
         $dumpfile("wave.vcd");
         $dumpvars(0, tb_process_frame_top);
-
-        // monitor + print outputs
-        // $monitor($time,,
-        //     "data = %h, data_valid = %b, hash = %b \
-        //     reg_data = %h, reg_hash = %h, fsm_counter = %d \
-        //     s = %s, ns = %s, \
-        //     hash_match(seen) = %b, save_hash_to_table = %b \
-        //     \
-        //     ",
-        //     data_i, data_valid_i, DUT.hash,
-        //     DUT.HASH_REGISTER.data_o, DUT.HASH_REGISTER.hash_o, DUT.counter,
-        //     // ready_for_new_data, send_frame_o, frame_received_i, 
-        //     DUT.FSM.current_state.name, DUT.FSM.next_state.name,
-        //     DUT.hash_match,
-        //     DUT.save_hash_to_table);
 
         // reset
         clk_i <= 0;
@@ -105,21 +96,22 @@ module tb_process_frame_top();
         #2 rst_ni <= 1;
 
         // some simple edge cases
-        data_i = 32'h0;
+        data_i = `RAW_WORD_LEN'h0;
         add_input_data(data_i);
 
-        data_i = 32'h0;
+        data_i = `RAW_WORD_LEN'h0;
         add_input_data(data_i);
 
-        data_i = 32'hFFFF_FFFF;
+        data_i = `RAW_WORD_LEN'hFFFF_FFFF;
         add_input_data(data_i);
 
-        data_i = 32'hDEAD_BEEF;
+        data_i = `RAW_WORD_LEN'hDEAD_BEEF;
         add_input_data(data_i);
 
         // simulate some random streamed inputs
         repeat (`NUM_TESTS) begin
-            data_i = $urandom_range(32'h0, 32'hFFFF_FFFF);
+            // data_i = $urandom();
+            data_i = rand_word();
             add_input_data(data_i);
 
             // A random boolean to decide whether the next word is the same or not, and send again if so
@@ -127,7 +119,6 @@ module tb_process_frame_top();
             loop_count = 0;
             {unused_bits, repeat_variable} = $urandom();
             while (repeat_variable && loop_count < 4) begin 
-                // $display("--------- repeating data ---------");
                 add_input_data(data_i);
                 loop_count = loop_count + 1;
             end 

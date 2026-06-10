@@ -9,9 +9,9 @@
 
 package frame_pkg;
 
-localparam int unsigned HASH_LEN           = 5;
-localparam int unsigned RAW_WORD_LEN       = 32;
-localparam int unsigned REPEAT_COUNTER_LEN = 32;
+localparam int unsigned HASH_LEN           = 8;
+localparam int unsigned RAW_WORD_LEN       = 64;
+localparam int unsigned REPEAT_COUNTER_LEN = 8;
 
 typedef enum logic [7:0] {
     VERSION_MSB             = 7,
@@ -48,8 +48,8 @@ typedef struct packed {
 
 typedef struct packed {
     logic [31:0]                        DataSize;       // 4 bytes
-    logic [HASH_LEN-1:0]               Hash;
-    logic [REPEAT_COUNTER_LEN-1:0]     RepeatCounter;
+    logic [HASH_LEN-1:0]                Hash;
+    logic [REPEAT_COUNTER_LEN-1:0]      RepeatCounter;
     logic [31:0]                        BlockChecksum;  // 0-4 bytes (optional, only if FLG[4] is set)
 } seen_data_block_t;
 

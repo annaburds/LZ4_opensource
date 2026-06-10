@@ -17,7 +17,7 @@ import frame_pkg::*;
 
 module new_frame_assembler #(
     parameter int unsigned RawWordLen       = 32,
-    parameter int unsigned HashLen          = 5,
+    parameter int unsigned HashLen          = 8,
     parameter int unsigned RepeatCounterLen = 32
 ) (
     input  logic                       clk_i,
@@ -113,7 +113,7 @@ module seen_frame_assembler #(
                 HC:           8'hFF     // TODO: replace placeholder header checksum
             },
             DataBlock: '{
-                RawData: RawWordLen'({9'b0, hash_i, counter_i[15:0]})
+                RawData: RawWordLen'({hash_i, counter_i})
             },
             EndMark:         32'h0000_0000,
             ContentChecksum: 32'hFFFF_FFFF  // TODO: replace placeholder

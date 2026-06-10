@@ -3,17 +3,16 @@
 // TODO: create a mode to stop compressing the data if the hash table is full and we don't want to evict anything
 
 module process_frame_top #(
-    parameter int unsigned WordLen             = 32,
-    parameter int unsigned StreamLen           = 32'd1024,
-    parameter int unsigned HashWidth           = 5,
-    parameter int unsigned RepeatCounterWidth  = 32
+    parameter int unsigned WordLen             = 64,
+    parameter int unsigned StreamLen           = 1024,
+    parameter int unsigned HashWidth           = 8,
+    parameter int unsigned RepeatCounterWidth  = 8
 ) (
     input  logic clk_i,
     input  logic rst_ni,
     input  logic [StreamLen-1:0] data_stream_i,
     input  logic data_valid_i,
     input  logic frame_received_i,
-    // TODO standardize frame output width
     output generic_frame_struct_t frame_o,
     output logic ready_for_new_data_o,
     output logic send_frame_o
@@ -33,9 +32,6 @@ module process_frame_top #(
     logic [HashWidth-1:0] hash, register_hash;
 
     logic [RepeatCounterWidth-1:0] counter;
-    logic ready_for_new_data;
-
-    assign ready_for_new_data_o = ready_for_new_data;
 
     process_frame_fsm #(.WordLen(WordLen), .StreamLen(StreamLen), .HashWidth(HashWidth))
                     FSM
@@ -43,7 +39,6 @@ module process_frame_top #(
                      .table_full_i(table_full),
                      .hash_table_saved_i(hash_table_saved), 
                      .new_frame_ready_i(new_frame_ready),
-                    //  .next_word_same_i(next_word_same),
                      .seen_frame_ready_i(seen_frame_ready), 
                      .frame_received_i(frame_received_i),
                      .hash_match_i(hash_match), 
@@ -51,7 +46,7 @@ module process_frame_top #(
                      .data_stream_i(data_stream_i),
                      .data_word_i(data_word_i),
                      .counter_q(counter),
-                     .ready_for_new_data_o(ready_for_new_data), 
+                     .ready_for_new_data_o(ready_for_new_data_o), 
                      .evict_word_o(),
                      .save_hash_to_table_o(save_hash_to_table),
                      .save_hash_to_register_o(save_hash_to_register),
@@ -65,7 +60,6 @@ module process_frame_top #(
                      .hash_o(hash), 
                      .hash_onehot_o());
 
-    // TO DO: IMPLEMENT HASH TABLE AND HASH REGISTER MODULES
     hash_table #(.HashLen(HashWidth), .RawWordLen(WordLen))
                     HASH_TABLE
                     (.clk_i(clk_i), 
@@ -112,7 +106,6 @@ module process_frame_top #(
                      .sel(assemble_new_frame), 
                      .o(frame));
                     
-
     frame_register #(.Width($bits(generic_frame_struct_t)))
                     FRAME_REG
                     (.clk_i(clk_i), 
@@ -125,17 +118,17 @@ module process_frame_top #(
 endmodule : process_frame_top
 
 module process_frame_fsm #(
-    parameter int unsigned WordLen            = 32,
+    parameter int unsigned WordLen            = 64,
     parameter int unsigned StreamLen          = 1024,
-    parameter int unsigned HashWidth          = 5,
-    parameter int unsigned RepeatCounterLen   = 32
+    parameter int unsigned HashWidth          = 8,
+    parameter int unsigned RepeatCounterLen   = 8,
+    parameter int unsigned WordIndexLen       = StreamLen/WordLen
 ) (
     input logic clk_i,
     input logic rst_ni,
     input logic table_full_i,
     input logic hash_table_saved_i,
     input logic new_frame_ready_i,
-    // input logic next_word_same_i,
     input logic seen_frame_ready_i,
     input logic frame_received_i,
     input logic hash_match_i,
@@ -151,7 +144,7 @@ module process_frame_fsm #(
     output logic [RepeatCounterLen-1:0] counter_q,
     output logic ready_for_new_data_o
 );
-    logic [WordLen-1:0]             word_index_q, word_index_next;
+    logic [WordIndexLen-1:0]        word_index_q, word_index_next; // TODO arithmetic to adjust length accurately
     logic                           next_word_same;
     logic [WordLen-1:0]             next_data_word;
     logic [RepeatCounterLen-1:0]    counter_next;
@@ -174,7 +167,6 @@ module process_frame_fsm #(
             word_index_q    <= 0;
             counter_q       <= 1;
         end else begin
-            // data_word_i <= data_stream_i[word_index*WordLen +: WordLen];
             current_state   <= next_state;
             word_index_q    <= word_index_next;
             counter_q       <= counter_next;
@@ -203,9 +195,7 @@ module process_frame_fsm #(
         case( current_state )
             START: begin
                 // Reset the hash register and counter for the new frame.
-                // hash_register_reset_o = 1'b1;
                 counter_next = 1;
-                // data_word_i <= data_stream_i[word_index*WordLen +: WordLen];
 
                 // Check if the new word's hash is already in the table
                 // Hash table and hash generator are combinational
@@ -213,8 +203,8 @@ module process_frame_fsm #(
                 if (data_valid_i) save_hash_to_register_o = 1;
 
                 if (~data_valid_i)                      next_state = START; // Stay in START state until data is valid
-                else if (~hash_match_i && table_full_i)    next_state = TABLE_FULL;
-                else if (~hash_match_i)                    next_state = NEW_WORD;
+                else if (~hash_match_i && table_full_i) next_state = TABLE_FULL;
+                else if (~hash_match_i)                 next_state = NEW_WORD;
                 else                                    next_state = SEEN_WORD;
             end
             TABLE_FULL: begin
@@ -240,18 +230,14 @@ module process_frame_fsm #(
                 else                                    next_state = MAKE_NEW_FRAME;
             end
             SEEN_WORD: begin
-                // Save hash to register
-                // save_hash_to_register_o = 1'b1;
+                // Do we need this state? Hash should already be saved to register during START
 
                                                         next_state = CHECK_NEXT_WORD;
-
-                // if (hash_reg_saved_i)                   next_state = CHECK_NEXT_WORD;
-                // else                                    next_state = SEEN_WORD;
             end
             CHECK_NEXT_WORD: begin
                 // Increment counter
-                // Since counter starts at 1, we increment is we find out the next one is the same
-                next_data_word = data_stream_i[(word_index_q + counter_q)*WordLen +: WordLen];
+                // Since counter starts at 1, we increment if we find out the next one is the same
+                next_data_word = data_stream_i[(32'(word_index_q) + 32'(counter_q))*WordLen +: WordLen];
                 next_word_same = (next_data_word == data_word_i);
 
                 if (~next_word_same)
@@ -281,7 +267,7 @@ module process_frame_fsm #(
                                                         next_state = START;
                     send_frame_o = 1'b0;                // Stop sending frame after it has been received
                     ready_for_new_data_o = 1'b1;        // Ready for new data after sending the frame
-                    word_index_next = word_index_q + counter_q;
+                    word_index_next = word_index_q + WordIndexLen'(counter_q);
                 end
                 else                                    next_state = SEND_FRAME;
             end
