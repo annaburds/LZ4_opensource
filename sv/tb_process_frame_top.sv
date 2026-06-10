@@ -5,7 +5,7 @@ import frame_pkg::*;
 `define HASH_LEN            8
 `define REPEAT_COUNTER_LEN  8
 `define RAW_WORD_LEN        64
-`define DATA_STREAM_LEN     2048ontr
+`define DATA_STREAM_LEN     2048
 
 module tb_process_frame_top();
     logic                       clk_i;
