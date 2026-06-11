@@ -30,9 +30,11 @@ module process_frame_top #(
     
     logic [WordLen-1:0]     data_o, register_data, data_word_i;
     logic [HashWidth-1:0]   hash, register_hash;
-    logic [PositionLen-1:0] position, hashed_position, register_position;
+    logic [PositionLen-1:0] position, hashed_position, relative_position, register_position;
 
     logic [RepeatCounterWidth-1:0] counter;
+
+    assign relative_position = position - hashed_position;
 
     process_frame_fsm #(.WordLen(WordLen), 
                         .StreamLen(StreamLen), 
@@ -82,7 +84,7 @@ module process_frame_top #(
                      .rst_ni(rst_ni), 
                      .data_i(data_word_i), 
                      .hash_i(hash), 
-                     .position_i(hashed_position),
+                     .position_i(relative_position),
                      .load_i(save_hash_to_register),
                      .data_o(register_data), 
                      .hash_o(register_hash), 

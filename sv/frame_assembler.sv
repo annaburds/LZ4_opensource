@@ -75,7 +75,7 @@ module seen_frame_assembler #(
 ) (
     input  logic                            clk_i,
     input  logic                            rst_ni,
-    input  logic [PositionLen-1:0]              position_i,
+    input  logic [PositionLen-1:0]          position_i,
     input  logic [RepeatCounterLen-1:0]     counter_i, // for the number of times we've seen this hash before
     output generic_frame_struct_t           seen_frame_o,
     output logic                            seen_frame_ready_o
